@@ -1,2 +1,9 @@
 *.csv
+# VS Code və konfiqurasiya tənzimləmələri
+.vscode/
 .claude/
+*.config.json
+.env
+
+# Yaddaş və müvəqqəti fayllar
+.claude-code-router/
