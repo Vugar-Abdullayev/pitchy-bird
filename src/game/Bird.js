@@ -14,7 +14,7 @@ export class Bird {
     this.targetY = this.height / 2;
     this.velocity = 0;
 
-    this.smoothingFactor = 0.12;
+    this.smoothingFactor = 0.25;
     this.gravity = 0.018;      // sükut zamanı düşmə sürəti (0.015-0.02 aralığı)
     this.maxFallSpeed = 2.5;   // maksimal düşmə sürəti (2-3 aralığı)
 

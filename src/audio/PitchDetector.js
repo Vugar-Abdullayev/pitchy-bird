@@ -1,4 +1,4 @@
-import { NOTES } from '../audio/constants.js';
+import { NOTES, MIN_FREQ, MAX_FREQ } from '../audio/constants.js';
 
 export class PitchDetector {
   constructor() {
@@ -23,12 +23,12 @@ export class PitchDetector {
     this.octaveRatioMax = 2.2;
     this.invOctaveRatioMax = 1 / this.octaveRatioMin;
 
-    this.minFrequency = 196;
-    this.maxFrequency = 659;
+    // Use constants from constants.js for consistency
+    this.minFrequency = MIN_FREQ;
+    this.maxFrequency = MAX_FREQ;
 
     // Energy/volume thresholds for voice detection
-    this.minRMSThreshold = 0.005;       // Minimum RMS energy to consider signal (was 0.01, lowered for sensitivity)
-    this.minConfidence = 10;             // Minimum autocorrelation confidence
+    this.minRMSThreshold = 0.005;       // Minimum RMS energy to consider signal
     this.minEnergyRatio = 0.15;          // Minimum energy ratio (signal vs noise floor)
 
     this.isActive = false;
@@ -52,7 +52,9 @@ export class PitchDetector {
         await this.audioContext.resume();
       }
 
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
       // DEBUG (a): getUserMedia uğurlu oldu
       console.log('[PitchDetector] getUserMedia OK — sampleRate:', this.audioContext.sampleRate, 'tracks:', this.stream.getAudioTracks().map(t => t.label));
       this.source = this.audioContext.createMediaStreamSource(this.stream);
@@ -119,10 +121,10 @@ export class PitchDetector {
   /*
    * Robust auto-correlation pitch detection algorithm with improvements:
    * 1. RMS normalization for consistent amplitude handling
-   * 2. Spectral trimming to remove silent outliers
-   * 3. Correlation for known glottal closure periods using autocorrelation
-   * 4. Parabolic interpolation for sub-sample frequency accuracy
-   * 5. Confidence calculation based on signal-to-noise ratio
+   * 2. Correlation with proper lag range constraints for expected frequencies
+   * 3. Parabolic interpolation for sub-sample frequency accuracy
+   * 4. Confidence calculation based on normalized correlation strength
+   * 5. YIN-inspired peak picking with threshold
    */
   correlate(buf, sampleRate) {
     const SIZE = buf.length;
@@ -143,76 +145,89 @@ export class PitchDetector {
       normalizedBuf[i] = buf[i] / rms;
     }
 
-    // Step 3: Trim silent regions at start and end
-    const thres = 0.2;
-    let start = 0, end = SIZE - 1;
+    // Step 3: Define lag search range based on expected frequency range
+    // minLag = sampleRate / maxFrequency, maxLag = sampleRate / minFrequency
+    const minLag = Math.max(2, Math.floor(sampleRate / this.maxFrequency));
+    const maxLag = Math.min(SIZE - 1, Math.ceil(sampleRate / this.minFrequency));
 
-    // Find start of active signal
-    for (start = 0; start < SIZE / 2; start++) {
-      if (Math.abs(normalizedBuf[start]) >= thres) break;
-    }
-
-    // Find end of active signal
-    for (end = SIZE - 1; end > SIZE / 2; end--) {
-      if (Math.abs(normalizedBuf[end]) >= thres) break;
-    }
-
-    // Ensure minimum buffer length
-    const minBufferLen = 8;
-    if (end - start < minBufferLen) {
+    // Ensure valid range
+    if (minLag >= maxLag) {
       return { frequency: 0, confidence: 0 };
     }
 
-    const trimmed = normalizedBuf.slice(start, end + 1);
-    const n = trimmed.length;
-
-    // Step 4: Compute normalized auto-correlation
-    const correlation = new Float32Array(n);
+    // Step 4: Compute normalized auto-correlation only for relevant lags
+    const correlation = new Float32Array(maxLag + 1);
     let cMax = 0;
 
-    for (let lag = 0; lag < n; lag++) {
+    for (let lag = 0; lag <= maxLag; lag++) {
       let sum = 0;
-      // Optimized correlation calculation
-      for (let i = 0; i < n - lag; i++) {
-        sum += trimmed[i] * trimmed[i + lag];
+      const n = SIZE - lag;
+      for (let i = 0; i < n; i++) {
+        sum += normalizedBuf[i] * normalizedBuf[i + lag];
       }
-      // Normalize correlation
-      correlation[lag] = sum / (n - lag);
+      // Normalize correlation (unbiased estimator)
+      correlation[lag] = sum / n;
 
-      // Track maximum correlation
-      if (correlation[lag] > cMax) cMax = correlation[lag];
+      // Track maximum correlation in valid range
+      if (lag >= minLag && correlation[lag] > cMax) cMax = correlation[lag];
     }
 
-    // If max correlation is negligible, signal is too noisy
+    // If max correlation in valid range is too low, signal is too noisy
     if (cMax < 0.1) {
       return { frequency: 0, confidence: 0 };
     }
 
     // Step 5: Skip initial decline (classic YIN principle)
     let d = 0;
-    while (d < n - 1 && correlation[d] > correlation[d + 1]) d++;
+    while (d < maxLag && correlation[d] > correlation[d + 1]) d++;
 
-    // Find first peak after the initial decline
+    // Ensure we start searching from at least minLag
+    d = Math.max(d, minLag);
+
+    // Step 6: Find the best peak in the valid range using YIN-style threshold
+    // Look for first peak that exceeds a fraction of the global maximum
+    const peakThreshold = 0.15; // YIN typical threshold
     let peakIndex = -1;
     let peakValue = -1;
-    for (let i = d; i < n - 1; i++) {
-      if (correlation[i] > peakValue) {
-        peakValue = correlation[i];
-        peakIndex = i;
-        // Stop at first local maximum (first peak = fundamental period)
-        if (i + 1 < n && correlation[i] > correlation[i + 1]) {
-          break;
+
+    for (let i = d; i <= maxLag - 1; i++) {
+      // Check if this is a local maximum
+      if (correlation[i] > correlation[i - 1] && correlation[i] > correlation[i + 1]) {
+        // Check if it exceeds the threshold
+        if (correlation[i] >= peakThreshold * cMax) {
+          peakIndex = i;
+          peakValue = correlation[i];
+          break; // First peak above threshold = fundamental period (YIN principle)
+        }
+        // Track highest peak as fallback
+        if (correlation[i] > peakValue) {
+          peakValue = correlation[i];
+          peakIndex = i;
         }
       }
     }
 
-    if (peakIndex <= 0) {
+    // Fallback: if no peak above threshold, use the highest peak in range
+    if (peakIndex <= 0 || peakIndex < minLag) {
+      peakValue = -1;
+      peakIndex = -1;
+      for (let i = minLag; i <= maxLag - 1; i++) {
+        if (correlation[i] > correlation[i - 1] && correlation[i] > correlation[i + 1]) {
+          if (correlation[i] > peakValue) {
+            peakValue = correlation[i];
+            peakIndex = i;
+          }
+        }
+      }
+    }
+
+    if (peakIndex <= 0 || peakIndex < minLag) {
       return { frequency: 0, confidence: 0 };
     }
 
-    // Step 6: Parabolic interpolation for sub-sample precision
+    // Step 7: Parabolic interpolation for sub-sample precision
     let preciseIndex = peakIndex;
-    if (peakIndex > 0 && peakIndex < n - 1) {
+    if (peakIndex > 0 && peakIndex < maxLag) {
       const x1 = correlation[peakIndex - 1];
       const x2 = correlation[peakIndex];
       const x3 = correlation[peakIndex + 1];
@@ -227,22 +242,19 @@ export class PitchDetector {
       }
     }
 
-    // Step 7: Calculate frequency from precise index
+    // Step 8: Calculate frequency from precise index
     // Convert lag to period, then to frequency
     const precisePeriod = preciseIndex / sampleRate;
     const freq = 1.0 / precisePeriod;
 
-    // Validate frequency range (adjustable based on application)
-    const minFreq = 50;
-    const maxFreq = 2000;
-    if (freq < minFreq || freq > maxFreq) {
+    // Validate frequency range using class properties
+    if (freq < this.minFrequency || freq > this.maxFrequency) {
       return { frequency: 0, confidence: 0 };
     }
 
-    // Step 8: Calculate confidence as normalized correlation strength
-    // Normalize by maximum possible correlation (signal energy at lag 0)
-    const maxPossibleCorrelation = 1.0; // Since we're normalized
-    const confidence = Math.max(0, Math.min(100, (peakValue / maxPossibleCorrelation) * 100));
+    // Step 9: Calculate confidence as normalized correlation strength
+    // Normalize by maximum correlation in valid range
+    const confidence = Math.max(0, Math.min(100, (peakValue / cMax) * 100));
 
     return { frequency: freq, confidence: confidence };
   }
@@ -289,10 +301,15 @@ export class PitchDetector {
 
     return {
       frequency: freq,
-      midiNote: freq ? Math.round(freqToMidi(freq)) : null,
+      midiNote: freq ? this.freqToMidi(freq) : null,
       confidence: this.confidence,
       timestamp: Date.now()
     };
+  }
+
+  freqToMidi(freq) {
+    if (!freq || freq <= 0) return null;
+    return 69 + 12 * Math.log2(freq / 440);
   }
 
   stop() {
@@ -313,8 +330,4 @@ export class PitchDetector {
       this.audioContext.close();
     }
   }
-}
-
-function freqToMidi(freq) {
-  return 69 + 12 * Math.log2(freq / 440);
 }
