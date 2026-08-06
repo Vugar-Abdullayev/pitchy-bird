@@ -1,3 +1,5 @@
+import { midiToNoteName } from '../audio/constants.js';
+
 export class HUD {
   constructor() {
     this.scoreEl = document.getElementById('scoreEl');
@@ -42,7 +44,7 @@ export class HUD {
 
     const rawFreq = data.rawFrequency ? Math.round(data.rawFrequency) : 0;
     const filteredFreq = data.filteredFrequency ? Math.round(data.filteredFrequency) : 0;
-    const detectedNote = data.detectedNote !== null ? data.detectedNote : '—';
+    const detectedNote = data.detectedNote !== null ? midiToNoteName(data.detectedNote) : '—';
     const requiredNoteName = data.requiredNote ? data.requiredNote.name || data.requiredNote : '—';
     const semitoneDiff = data.semitoneDiff !== null && data.semitoneDiff !== Infinity ? Math.abs(data.semitoneDiff).toFixed(2) : '∞';
 

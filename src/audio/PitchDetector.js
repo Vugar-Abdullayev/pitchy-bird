@@ -242,6 +242,17 @@ export class PitchDetector {
       }
     }
 
+    // Step 7b: Octave discrimination — check if the fundamental is one octave lower
+    // If there's a strong correlation at 2× the lag, the true fundamental is lower
+    const doubleLag = preciseIndex * 2;
+    if (doubleLag <= maxLag && doubleLag >= minLag) {
+      const corrAtDoubleLag = correlation[Math.round(doubleLag)];
+      // If the correlation at double lag is strong enough, the fundamental is one octave lower
+      if (corrAtDoubleLag > 0.5 * cMax) {
+        preciseIndex = doubleLag;
+      }
+    }
+
     // Step 8: Calculate frequency from precise index
     // Convert lag to period, then to frequency
     const precisePeriod = preciseIndex / sampleRate;
