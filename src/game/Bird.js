@@ -1,4 +1,4 @@
-import { MIN_FREQ, MAX_FREQ, freqToY, NOTES } from '../audio/constants.js';
+import { freqToY } from '../audio/constants.js';
 
 export class Bird {
   constructor(options = {}) {
@@ -34,12 +34,23 @@ export class Bird {
     this.lastReading = null;
   }
 
+  /* İki ayrı rejim:
+       SƏS VAR  → quş perde hündürlüyünə doğru hamarlanır, cazibə yoxdur
+       SƏS YOX  → yalnız cazibə işləyir, hamarlama tamamilə söndürülür
+
+     Əvvəl hər iki qüvvə eyni anda tətbiq olunurdu. Nəticədə sükut zamanı
+     hamarlama quşu son notanın hündürlüyündə saxlayır, cazibə isə onu
+     aşağı çəkirdi — iki qüvvə ~21 piksel sonra tarazlaşır və quş düşməyi
+     dayandırırdı. Bu, A1 düzəlişindən sonra üzə çıxdı (M0). */
   update(deltaMs, reading) {
     const dt = deltaMs / 1000;
+    const frameScale = dt * 60;
 
     this.lastReading = reading;
 
-    if (reading && reading.frequency > 0) {
+    const hasSignal = !!(reading && reading.frequency > 0);
+
+    if (hasSignal) {
       this.filteredFreq = reading.frequency;
       this.freqHistory.push(reading.frequency);
       if (this.freqHistory.length > this.maxHistory) {
@@ -50,14 +61,28 @@ export class Bird {
       const targetFreq = medianFreq || this.filteredFreq;
 
       const targetY = freqToY(targetFreq, this.playTop, this.playBottom);
-      this.targetY = Math.max(this.playTop + this.birdRadius, Math.min(this.playBottom - this.birdRadius, targetY));
+      this.targetY = this.clampY(targetY);
+
+      this.velocity = 0;
+      this.y += (this.targetY - this.y) * this.smoothingFactor;
     } else {
-      this.velocity += this.gravity * dt * 60;
-      this.velocity = Math.min(this.velocity, this.maxFallSpeed);
+      /* Sükut: köhnə frekans tarixçəsi növbəti notanı çirkləndirməsin */
+      this.filteredFreq = 0;
+      this.freqHistory.length = 0;
+
+      this.velocity = Math.min(this.velocity + this.gravity * frameScale, this.maxFallSpeed);
+      this.y += this.velocity * frameScale;
+      this.targetY = this.y;
     }
 
-    this.y += (this.targetY - this.y) * this.smoothingFactor + this.velocity * dt * 60;
-    this.y = Math.max(this.playTop + this.birdRadius, Math.min(this.playBottom - this.birdRadius, this.y));
+    this.y = this.clampY(this.y);
+  }
+
+  clampY(y) {
+    return Math.max(
+      this.playTop + this.birdRadius,
+      Math.min(this.playBottom - this.birdRadius, y)
+    );
   }
 
   getMedian(arr) {

@@ -28,6 +28,14 @@ export class HUD {
     this.overOverlay.style.display = 'none';
   }
 
+  /* Başlanğıc ekranına qayıt. Mikrofon xəta mesajı (#micStatus) məhz bu
+     overlay-in içindədir — retry zamanı xəta baş verərsə buraya qayıtmasaq
+     istifadəçi mesajı heç vaxt görmür. */
+  showStartOverlay() {
+    this.overOverlay.style.display = 'none';
+    this.startOverlay.style.display = 'flex';
+  }
+
   showGameOver(score) {
     this.overOverlay.style.display = 'flex';
     this.finalScore.textContent = score;

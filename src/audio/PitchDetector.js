@@ -23,6 +23,21 @@ export class PitchDetector {
     this.octaveRatioMax = 2.2;
     this.invOctaveRatioMax = 1 / this.octaveRatioMin;
 
+    this._rafId = null;
+    this.debugLog = true;   // müvəqqəti — M1-də normal göstərici ilə əvəz olunur
+
+    /* Alqoritmin fiziki iş diapazonu — oyunun nota diapazonu ilə eyni deyil.
+       Geniş saxlayırıq ki, diapazon kənarına düşən səsi də TAPA bilək və
+       sonra "sən bemol çalırsan" deyə bilək. */
+    this.absMinFreq = 80;
+    this.absMaxFreq = 1200;
+
+    /* Siqnalın periodik sayılması üçün minimum NSDF gücü */
+    this.nsdfThreshold = 0.5;
+
+    /* Təpə seçimi: ən güclünün bu nisbətini keçən ilk təpə seçilir */
+    this.peakPickRatio = 0.9;
+
     this.minFrequency = 196;
     this.maxFrequency = 659;
 
@@ -38,8 +53,9 @@ export class PitchDetector {
   }
 
   async start() {
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      return;
+    /* Artıq işləyirsə yenidən qurma — ikiqat start qorunması (M0). */
+    if (this.isActive) {
+      return true;
     }
 
     if (!window.AudioContext && !window.webkitAudioContext) {
@@ -89,161 +105,171 @@ export class PitchDetector {
   }
 
   autoCorrelate() {
-    if (!this.isActive || !this.analyser) return;
+    if (!this.isActive) return;
 
-    requestAnimationFrame(() => {
+    this._rafId = requestAnimationFrame(() => {
+      /* Qorunma məhz BURADA olmalıdır, planlamadan əvvəl yox.
+         stop() çağırılanda növbədə artıq bir kadr qalır; o kadr işə düşəndə
+         analyser artıq null-dur. Əvvəl bu kadr köhnə (disconnect edilmiş)
+         obyektə toxunurdu və səssizcə keçirdi — M0-da referanslar null
+         edildikdən sonra TypeError kimi üzə çıxdı. */
+      if (!this.isActive || !this.analyser || !this.audioContext) return;
+
       const data = this.dataBuffer;
       this.analyser.getFloatTimeDomainData(data);
 
-      // DEBUG: every frame log first few values and check for non-zero
-      const hasNonZero = data.some(v => v !== 0);
-      const sumAbs = data.reduce((acc, v) => acc + Math.abs(v), 0);
-      const avgAbs = sumAbs / data.length;
-      this._debugFrame++;
-      if (this._debugFrame % 30 === 0) {
-        console.log('[PitchDetector] frame', this._debugFrame,
-          '| bufferLength:', data.length,
-          '| hasNonZero:', hasNonZero,
-          '| avg|v|:', avgAbs.toFixed(6),
-          '| first5:', data.slice(0,5).map(v=>v.toFixed(3)));
-      }
+      let sumAbs = 0;
+      for (let i = 0; i < data.length; i++) sumAbs += Math.abs(data[i]);
+      const level = sumAbs / data.length;
 
       const result = this.correlate(data, this.audioContext.sampleRate);
       this.processFrequencyData(result);
 
-      // Schedule next autocorrelation step
+      /* Müvəqqəti diaqnostika. Bir sətirdə bütün zəncir görünür:
+         mikrofon → alqoritm → diapazon süzgəci → oyuna gedən dəyər. */
+      this._debugFrame++;
+      if (this.debugLog && this._debugFrame % 30 === 0) {
+        const f = result.frequency;
+        const inRange = f >= this.minFrequency && f <= this.maxFrequency;
+        console.log(
+          '[Pitch] səviyyə:', level.toFixed(4),
+          '| tapıldı:', f ? f.toFixed(1) + ' Hz' : 'YOX',
+          '| güvən:', Math.round(result.confidence),
+          '| diapazon:', !f ? '—' : (inRange ? 'OK' : 'ATILDI (' + this.minFrequency + '-' + this.maxFrequency + ' Hz kənarı)'),
+          '| oyuna gedən:', this.currentFreq ? this.currentFreq.toFixed(1) + ' Hz' : '0'
+        );
+      }
+
       this.autoCorrelate();
     });
   }
 
   /*
-   * Robust auto-correlation pitch detection algorithm with improvements:
-   * 1. RMS normalization for consistent amplitude handling
-   * 2. Spectral trimming to remove silent outliers
-   * 3. Correlation for known glottal closure periods using autocorrelation
-   * 4. Parabolic interpolation for sub-sample frequency accuracy
-   * 5. Confidence calculation based on signal-to-noise ratio
+   * Tezlik tapma — McLeod Pitch Method (MPM).
+   *
+   * Köhnə üsul "ilk enişi keç, sonra rast gəldiyin ilk təpəni götür"
+   * deyirdi. Bu iki halda dağılırdı:
+   *   - küy kiçik saxta təpə yaradırdı → tamamilə səhv rəqəm
+   *   - əsas ton zəif olanda üst tonun təpəsi əvvəl gəlirdi → 2x/3x səhv
+   *
+   * MPM üç şeyi dəyişir:
+   *   1. NSDF — nəticəni [-1, 1] aralığına normallaşdırır. Uzaq lag-larda
+   *      qiymət sönmür, ona görə müqayisə ədalətli olur.
+   *   2. Yalnız "açar təpələr" — sıfır keçidləri arasındakı ən yüksək nöqtə.
+   *      Küyün yaratdığı xırda dalğalanmalar avtomatik kənarda qalır.
+   *   3. Ən güclü təpənin 90%-ni keçən İLK təpəni seçir. Üst ton həmişə
+   *      əsas tondan SONRA gəldiyi üçün əsas ton qalib gəlir.
    */
   correlate(buf, sampleRate) {
     const SIZE = buf.length;
 
-    // Step 1: Compute RMS with proper normalization
     let rmsSquared = 0;
     for (let i = 0; i < SIZE; i++) rmsSquared += buf[i] * buf[i];
     const rms = Math.sqrt(rmsSquared / SIZE);
 
-    // Early exit if signal is too quiet
     if (rms < this.minRMSThreshold) {
       return { frequency: 0, confidence: 0 };
     }
 
-    // Step 2: Normalize the buffer to unit RMS for correlation
-    const normalizedBuf = new Float32Array(SIZE);
-    for (let i = 0; i < SIZE; i++) {
-      normalizedBuf[i] = buf[i] / rms;
-    }
+    /* DC sürüşməsini çıxar — bəzi mikrofonlarda sabit ofset olur */
+    let mean = 0;
+    for (let i = 0; i < SIZE; i++) mean += buf[i];
+    mean /= SIZE;
 
-    // Step 3: Trim silent regions at start and end
-    const thres = 0.2;
-    let start = 0, end = SIZE - 1;
-
-    // Find start of active signal
-    for (start = 0; start < SIZE / 2; start++) {
-      if (Math.abs(normalizedBuf[start]) >= thres) break;
-    }
-
-    // Find end of active signal
-    for (end = SIZE - 1; end > SIZE / 2; end--) {
-      if (Math.abs(normalizedBuf[end]) >= thres) break;
-    }
-
-    // Ensure minimum buffer length
-    const minBufferLen = 8;
-    if (end - start < minBufferLen) {
+    const minLag = Math.max(2, Math.floor(sampleRate / this.absMaxFreq));
+    const maxLag = Math.min(SIZE - 1, Math.ceil(sampleRate / this.absMinFreq));
+    if (maxLag <= minLag + 2) {
       return { frequency: 0, confidence: 0 };
     }
 
-    const trimmed = normalizedBuf.slice(start, end + 1);
-    const n = trimmed.length;
-
-    // Step 4: Compute normalized auto-correlation
-    const correlation = new Float32Array(n);
-    let cMax = 0;
-
-    for (let lag = 0; lag < n; lag++) {
-      let sum = 0;
-      // Optimized correlation calculation
-      for (let i = 0; i < n - lag; i++) {
-        sum += trimmed[i] * trimmed[i + lag];
+    /* NSDF: 2·r(τ) / m(τ). Nəticə [-1, 1] aralığındadır və
+       1.0 = tam təkrarlanma deməkdir. */
+    const nsdf = new Float32Array(maxLag + 1);
+    for (let lag = 0; lag <= maxLag; lag++) {
+      let acf = 0;
+      let energy = 0;
+      const limit = SIZE - lag;
+      for (let i = 0; i < limit; i++) {
+        const a = buf[i] - mean;
+        const b = buf[i + lag] - mean;
+        acf += a * b;
+        energy += a * a + b * b;
       }
-      // Normalize correlation
-      correlation[lag] = sum / (n - lag);
-
-      // Track maximum correlation
-      if (correlation[lag] > cMax) cMax = correlation[lag];
+      nsdf[lag] = energy > 0 ? (2 * acf) / energy : 0;
     }
 
-    // If max correlation is negligible, signal is too noisy
-    if (cMax < 0.1) {
-      return { frequency: 0, confidence: 0 };
-    }
+    /* Açar təpələr: hər müsbət bölgədə yalnız ən yüksək nöqtə.
+       Əvvəlcə lag=0-dakı təpəni keçirik (o həmişə 1.0-dır). */
+    const keyMaxima = [];
+    let lag = 0;
+    while (lag <= maxLag && nsdf[lag] > 0) lag++;
 
-    // Step 5: Skip initial decline (classic YIN principle)
-    let d = 0;
-    while (d < n - 1 && correlation[d] > correlation[d + 1]) d++;
+    while (lag <= maxLag) {
+      while (lag <= maxLag && nsdf[lag] <= 0) lag++;
+      if (lag > maxLag) break;
 
-    // Find first peak after the initial decline
-    let peakIndex = -1;
-    let peakValue = -1;
-    for (let i = d; i < n - 1; i++) {
-      if (correlation[i] > peakValue) {
-        peakValue = correlation[i];
-        peakIndex = i;
-        // Stop at first local maximum (first peak = fundamental period)
-        if (i + 1 < n && correlation[i] > correlation[i + 1]) {
-          break;
+      let bestLag = lag;
+      let bestVal = nsdf[lag];
+      while (lag <= maxLag && nsdf[lag] > 0) {
+        if (nsdf[lag] > bestVal) {
+          bestVal = nsdf[lag];
+          bestLag = lag;
         }
+        lag++;
       }
+      if (bestLag >= minLag) keyMaxima.push(bestLag);
     }
 
-    if (peakIndex <= 0) {
+    if (keyMaxima.length === 0) {
       return { frequency: 0, confidence: 0 };
     }
 
-    // Step 6: Parabolic interpolation for sub-sample precision
-    let preciseIndex = peakIndex;
-    if (peakIndex > 0 && peakIndex < n - 1) {
-      const x1 = correlation[peakIndex - 1];
-      const x2 = correlation[peakIndex];
-      const x3 = correlation[peakIndex + 1];
+    let globalMax = 0;
+    for (const k of keyMaxima) {
+      if (nsdf[k] > globalMax) globalMax = nsdf[k];
+    }
 
-      // Parabolic coefficients
+    /* Ən güclü təpə belə zəifdirsə, siqnal periodik deyil (küy, nəfəs, otaq) */
+    if (globalMax < this.nsdfThreshold) {
+      return { frequency: 0, confidence: 0 };
+    }
+
+    /* HƏLLEDİCİ ADDIM: ən güclünün 90%-ni keçən İLK təpə.
+       Üst tonlar həmişə daha böyük lag-da (yəni sonra) olduğu üçün
+       bu seçim əsas tonu üstün tutur. */
+    const cutoff = globalMax * this.peakPickRatio;
+    let chosen = keyMaxima[keyMaxima.length - 1];
+    for (const k of keyMaxima) {
+      if (nsdf[k] >= cutoff) {
+        chosen = k;
+        break;
+      }
+    }
+
+    /* Parabolik interpolyasiya — nümunələr arası dəqiqlik üçün */
+    let preciseLag = chosen;
+    if (chosen > 0 && chosen < maxLag) {
+      const x1 = nsdf[chosen - 1];
+      const x2 = nsdf[chosen];
+      const x3 = nsdf[chosen + 1];
       const a = (x1 + x3 - 2 * x2) / 2;
       const b = (x3 - x1) / 2;
-
-      // Calculate vertex of parabola for fractional index
-      if (Math.abs(a) > 1e-10) {
-        preciseIndex = peakIndex - b / (2 * a);
+      if (Math.abs(a) > 1e-12) {
+        const shift = -b / (2 * a);
+        if (Math.abs(shift) < 1) preciseLag = chosen + shift;
       }
     }
 
-    // Step 7: Calculate frequency from precise index
-    // Convert lag to period, then to frequency
-    const precisePeriod = preciseIndex / sampleRate;
-    const freq = 1.0 / precisePeriod;
-
-    // Validate frequency range (adjustable based on application)
-    const minFreq = 50;
-    const maxFreq = 2000;
-    if (freq < minFreq || freq > maxFreq) {
+    if (preciseLag <= 0) {
       return { frequency: 0, confidence: 0 };
     }
 
-    // Step 8: Calculate confidence as normalized correlation strength
-    // Normalize by maximum possible correlation (signal energy at lag 0)
-    const maxPossibleCorrelation = 1.0; // Since we're normalized
-    const confidence = Math.max(0, Math.min(100, (peakValue / maxPossibleCorrelation) * 100));
+    const freq = sampleRate / preciseLag;
+    if (freq < this.absMinFreq || freq > this.absMaxFreq) {
+      return { frequency: 0, confidence: 0 };
+    }
 
+    const confidence = Math.max(0, Math.min(100, nsdf[chosen] * 100));
     return { frequency: freq, confidence: confidence };
   }
 
@@ -255,6 +281,10 @@ export class PitchDetector {
       if (this.silentFrames >= 3) {
         this.hysteresis = 0;
         this.currentFreq = 0;
+        this.confidence = 0;
+        /* Oktav-sıçrayış referansını da sıfırlayırıq: fasilədən sonra gələn
+           ilk nota köhnə notaya görə "sıçrayış" sayılmamalıdır. */
+        this.lastStrongFreq = 0;
       }
       return;
     }
@@ -284,19 +314,29 @@ export class PitchDetector {
     }
   }
 
+  /* Cari oxunuş. Səs yoxdursa frequency = 0 qaytarır.
+     DİQQƏT: burada lastValidFreq-ə fallback etmək olmaz. Əvvəl belə idi və
+     buna görə sükut heç vaxt oyuna çatmırdı (M0 / A1). */
   getReading() {
-    const freq = this.currentFreq || this.lastValidFreq || 0;
+    const freq = this.currentFreq || 0;
+    const hasSignal = freq > 0;
 
     return {
       frequency: freq,
-      midiNote: freq ? Math.round(freqToMidi(freq)) : null,
-      confidence: this.confidence,
+      midiNote: hasSignal ? Math.round(freqToMidi(freq)) : null,
+      confidence: hasSignal ? this.confidence : 0,
+      hasSignal: hasSignal,
       timestamp: Date.now()
     };
   }
 
   stop() {
     this.isActive = false;
+
+    if (this._rafId !== null) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
 
     if (this.source) {
       this.source.disconnect();
@@ -312,6 +352,20 @@ export class PitchDetector {
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
     }
+
+    /* Referansları təmizlə — əks halda start() ikinci dəfə düzgün işləmir. */
+    this.source = null;
+    this.analyser = null;
+    this.stream = null;
+    this.audioContext = null;
+    this.dataBuffer = null;
+
+    this.currentFreq = 0;
+    this.lastValidFreq = 0;
+    this.confidence = 0;
+    this.hysteresis = 0;
+    this.silentFrames = 0;
+    this.lastStrongFreq = 0;
   }
 }
 

@@ -73,15 +73,15 @@ export class CollisionSystem {
       if (!p.passed && p.x + pipe.pipeWidth < bird.birdX - birdRadius) {
         p.passed = true;
 
+        /* Nota fərqi yalnız GERİ BİLDİRİŞ üçün hesablanır — ölüm səbəbi deyil.
+           Qərar (Gate B): yalnız divara dəymək öldürür, səhv nota yox.
+           Boşluq onsuz da düzgün notanın hündürlüyündə açılır, yəni
+           entonasiya yoxlaması artıq həndəsənin içindədir. */
         const medianDiff = this.medianSemitoneDiff(p.note.freq);
         this.lastSemitoneDiff = medianDiff;
         this.lastPass = medianDiff <= this.tolerance;
 
-        if (this.lastPass) {
-          passedPipe = true;
-        } else {
-          collided = true;
-        }
+        passedPipe = true;
       }
     }
 

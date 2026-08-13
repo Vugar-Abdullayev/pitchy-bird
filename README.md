@@ -2,81 +2,92 @@
 
 **Skripka Flappy — Nota ilə Uç**
 
-Mikrofon vasitəsi ilə tutulan səs tezliyi ilə idarə olunan Flappy Bird tipli oyun. Hədəf auditoriya skripka öyrənənlərdir.
+Mikrofondan tutulan səs tezliyi ilə idarə olunan Flappy Bird tipli oyun.
+Hədəf auditoriya: skripka öyrənənlər.
 
-## Qurulama
+Status: **erkən mərhələ.** Oyun oynanır, lakin pitch detection hələ ölçülməyib
+və istehsalat səviyyəsində deyil. Bax: "Bilinən məhdudiyyətlər".
+
+## Qurulum
 
 ```bash
 npm install
 npm run dev
 ```
 
-Oyun avtomatik olaraq `http://localhost:5173` adresinə açılacaq.
+Oyun `http://localhost:5173` ünvanında açılır. Mikrofon icazəsi tələb olunur.
 
-## Fayl Strukturu
+```bash
+npm run build     # dist/ qovluğuna build
+npm run preview   # build-i lokal yoxla
+```
+
+## Necə işləyir
+
+```
+Mikrofon
+  → PitchDetector      tezlik + confidence çıxarır
+  → Bird               tezliyi ekran hündürlüyünə çevirir
+  → CollisionSystem    həndəsi toqquşma + nota geri bildirişi
+  → Renderer           canvas
+```
+
+Quşun hündürlüyü **loqarifmik** olaraq tezliyə bağlıdır: ekranın hər yerində
+1 sent fərq eyni piksel fərqinə uyğun gəlir. Bu, entonasiya səhvinin ekranın
+hər nöqtəsində eyni cür görünməsi üçün vacibdir.
+
+Diapazon: **G3 (196 Hz) — E5 (659 Hz)** — skripkanın birinci mövqe zonası,
+ən qalın simdən ən nazik simə qədər.
+
+## Fayl strukturu
 
 ```
 pitchy-bird/
-├── index.html          # SKELETON + script bağlantıları
-├── style.css           # Çəkmə və skrupka teması
+├── index.html
+├── style.css
 ├── vite.config.js
-├── src/
-│   ├── audio/
-│   │   ├── constants.js       # NOTES, MIN_FREQ, MAX_FREQ, TOLERANCE_SEMITONES
-│   │   ├── PitchDetector.js   # Mikrofon → {frequency, midiNote, confidence, timestamp}
-│   │   └── NoteMatcher.js     # freq → MIDI, semitone fərqi, tolerantlıq məntiqi
-│   ├── game/
-│   │   ├── Bird.js             # Mövqe, delta-time hamarlama
-│   │   ├── Pipe.js
-│   │   ├── GameLoop.js
-│   │   └── CollisionSystem.js  # Semitone-tolerant keçid Qianası
-│   ├── render/
-│   │   └── Renderer.js         # Canvas çəkmə
-│   └── ui/
-│       └── HUD.js              # Skor, overlay-lər, debug gostəriciller
-└── main.js                       # Giriş nöqtəsi
+└── src/
+    ├── main.js                 # giriş nöqtəsi, oyun döngüsü
+    ├── audio/
+    │   ├── constants.js        # NOTES cədvəli, tezlik↔MIDI↔Y çevirmələri
+    │   ├── PitchDetector.js    # mikrofon → { frequency, midiNote, confidence, hasSignal }
+    │   └── NoteMatcher.js      # semiton fərqi hesablamaları
+    ├── game/
+    │   ├── Bird.js             # mövqe, hamarlama, cazibə
+    │   ├── Pipe.js             # boru spawn və hərəkəti
+    │   ├── CollisionSystem.js  # toqquşma + nota geri bildirişi
+    │   └── GameLoop.js         # HAZIRDA İSTİFADƏ OLUNMUR (main.js öz döngüsünü işlədir)
+    ├── render/Renderer.js
+    └── ui/HUD.js
 ```
 
-## Konfiqurasiya Edilən Parametrlər
+## Oyun qaydası
 
-```
-src/audio/constants.js
-├── TOLERANCE_SEMITONES = 0.5   # Pipe keçid tolerantlığı (yarım ton)
-├── SIGNAL_LOSS_FRAMES = 5      # "Səssizlik"_choice iż sém chão
-├── OCTAVE_RATIO_MIN = 0.45     # Oktava-xətası filtrinin alt hədd
-├── OCTAVE_RATIO_MAX = 2.2      # Oktava-xətası filtrinin üst hədd
-└── SMOOTHING_FACTOR = 0.12     # Quşun Y hamarlama əmsalı
-```
+- Notanı çal (və ya oxu) — quş həmin notanın hündürlüyünə qalxır
+- Sussan quş düşür
+- **Yalnız boruya dəymək öldürür.** Səhv nota öldürmür — boşluq onsuz da
+  düzgün notanın hündürlüyündə açılır
 
-### Tənzimləmə
+## Bilinən məhdudiyyətlər
 
-Bu parametrləri `src/audio/constants.js` fayl quitterinde `export const` blok unfoldeddaction:
+Bunlar məlumdur və roadmap-də planlaşdırılıb — yeni issue açmağa ehtiyac yoxdur:
 
-```javascript
-export const TOLERANCE_SEMITONES = 0.5;   // 0.5 = yarım ton, 1.0 = tam ton
-export const SIGNAL_LOSS_FRAMES = 5;      // 3-7 arası təstiq’intention müddətidən
-#### scarcely
-export const OCTAVE_RATIO_MIN = 0.45;
-export const OCTAVE_RATIO_MAX = 2.2;
-export const SMOOTHING_FACTOR = 0.12;     // 0.1-0.2 arası təqdimat
-```
+- **Pitch detection ölçülməyib.** Real skripkada dəqiqliyi bilinmir. Test
+  infrastrukturu M1-də qurulur.
+- **Audio emalı əsas thread-də işləyir** və `requestAnimationFrame`-ə bağlıdır.
+  Mobil cihazlarda kəkələmə ehtimalı var (M2).
+- **Boru sürəti kadr tezliyindən asılıdır.** 120 Hz ekranda oyun iki dəfə
+  sürətli işləyir (M4).
+- **Boşluq həddindən artıq genişdir** (~±300 sent). Entonasiya faktiki olaraq
+  yoxlanmır (M5).
+- **`constants.js`-dəki bəzi parametrlər hələ qoşulmayıb:** `SIGNAL_LOSS_FRAMES`,
+  `SMOOTHING_FACTOR`, `OCTAVE_RATIO_MIN/MAX` export olunur, lakin heç yerdən
+  import edilmir. Onları dəyişmək hazırda heç bir təsir yaratmır (M2).
+  Faktiki olaraq işləyən yeganə parametr: `TOLERANCE_SEMITONES`.
+- **Mobil dəstəklənmir.** Canvas sabit 720×480-dir (M6).
+- **Test yoxdur** (M1).
 
-## Qurbanası
+## Brauzer tələbləri
 
-Oyunda aşağıdakı məlumatlar canlı olaraq göstərilir:
-
-- **Raw frequency**: Mikrofon üçün cima Toenış (Hz)
-- **Filtered frequency**: Hesablanış filtrərli tezlik
-- **Detected note**: Tutulan nota (MIDI nömrisi)
-- **Target note**: Boru tələb eden nota
-- **Semitone diff**: Ərasadə stava (∞ = məcburi yoxdur)
-
-## Versiya Tarixçəsi
-
-- **v0.1.0** — Modul struktura واحدًا, Problem 1 (nota tolerantlıq) və Problem 2 (quşun hərağı) həll øldurda.
-
-## Əsas HARAMDAR
-
-- [ ] Fawell teslamını artisan
-- [ ] İlan gelən colonnes
-- [ ] Məlumat intéq eləUE
+`getUserMedia` və `AudioContext` dəstəyi lazımdır, həmçinin **secure context**
+(`https://` və ya `localhost`). Adi `http://` üzərindən mikrofon açılmır.
