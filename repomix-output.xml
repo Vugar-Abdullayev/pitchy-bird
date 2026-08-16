@@ -1,0 +1,3116 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+pitchy-bird/
+  .git/
+    hooks/
+      applypatch-msg.sample
+      commit-msg.sample
+      fsmonitor-watchman.sample
+      post-update.sample
+      pre-applypatch.sample
+      pre-commit.sample
+      pre-merge-commit.sample
+      pre-push.sample
+      pre-rebase.sample
+      pre-receive.sample
+      prepare-commit-msg.sample
+      push-to-checkout.sample
+      sendemail-validate.sample
+      update.sample
+    info/
+      exclude
+    logs/
+      refs/
+        heads/
+          main
+        remotes/
+          origin/
+            HEAD
+      HEAD
+    objects/
+      pack/
+        pack-a1bec4f10fa6ada2ae9ba864777eaae62fd73231.idx
+        pack-a1bec4f10fa6ada2ae9ba864777eaae62fd73231.pack
+        pack-a1bec4f10fa6ada2ae9ba864777eaae62fd73231.rev
+    refs/
+      heads/
+        main
+      remotes/
+        origin/
+          HEAD
+    config
+    description
+    HEAD
+    index
+    packed-refs
+  dist/
+    assets/
+      index-BqqKQ1aD.js
+      index-BMw2DXHJ.css
+    index.html
+  src/
+    audio/
+      constants.js
+      NoteMatcher.js
+      PitchDetector.js
+    game/
+      Bird.js
+      CollisionSystem.js
+      GameLoop.js
+      Pipe.js
+    render/
+      Renderer.js
+    ui/
+      HUD.js
+    main.js
+  .gitignore
+  bird.html
+  index.html
+  package.json
+  README.md
+  style.css
+  vite.config.js
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="pitchy-bird/.git/hooks/applypatch-msg.sample">
+#!/bin/sh
+#
+# An example hook script to check the commit log message taken by
+# applypatch from an e-mail message.
+#
+# The hook should exit with non-zero status after issuing an
+# appropriate message if it wants to stop the commit.  The hook is
+# allowed to edit the commit message file.
+#
+# To enable this hook, rename this file to "applypatch-msg".
+
+. git-sh-setup
+commitmsg="$(git rev-parse --git-path hooks/commit-msg)"
+test -x "$commitmsg" && exec "$commitmsg" ${1+"$@"}
+:
+</file>
+
+<file path="pitchy-bird/.git/hooks/commit-msg.sample">
+#!/bin/sh
+#
+# An example hook script to check the commit log message.
+# Called by "git commit" with one argument, the name of the file
+# that has the commit message.  The hook should exit with non-zero
+# status after issuing an appropriate message if it wants to stop the
+# commit.  The hook is allowed to edit the commit message file.
+#
+# To enable this hook, rename this file to "commit-msg".
+
+# Uncomment the below to add a Signed-off-by line to the message.
+# Doing this in a hook is a bad idea in general, but the prepare-commit-msg
+# hook is more suited to it.
+#
+# SOB=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
+# grep -qs "^$SOB" "$1" || echo "$SOB" >> "$1"
+
+# This example catches duplicate Signed-off-by lines and messages that
+# would confuse 'git am'.
+
+ret=0
+
+test "" = "$(grep '^Signed-off-by: ' "$1" |
+	 sort | uniq -c | sed -e '/^[ 	]*1[ 	]/d')" || {
+	echo >&2 Duplicate Signed-off-by lines.
+	ret=1
+}
+
+comment_re="$(
+	{
+		git config --get-regexp "^core\.comment(char|string)\$" ||
+			echo '#'
+	} | sed -n -e '
+		${
+			s/^[^ ]* //
+			s|[][*./\]|\\&|g
+			s/^auto$/[#;@!$%^&|:]/
+			p
+		}'
+)"
+scissors_line="^${comment_re} -\{8,\} >8 -\{8,\}\$"
+comment_line="^${comment_re}.*"
+blank_line='^[ 	]*$'
+# Disallow lines starting with "diff -" or "Index: " in the body of the
+# message. Stop looking if we see a scissors line.
+line="$(sed -n -e "
+	# Skip comments and blank lines at the start of the file.
+	/${scissors_line}/q
+	/${comment_line}/d
+	/${blank_line}/d
+	# The first paragraph will become the subject header so
+	# does not need to be checked.
+	: subject
+	n
+	/${scissors_line}/q
+	/${blank_line}/!b subject
+	# Check the body of the message for problematic
+	# prefixes.
+	: body
+	n
+	/${scissors_line}/q
+	/${comment_line}/b body
+	/^diff -/{p;q;}
+	/^Index: /{p;q;}
+	b body
+	" "$1")"
+if test -n "$line"
+then
+	echo >&2 "Message contains a diff that will confuse 'git am'."
+	echo >&2 "To fix this indent the diff."
+	ret=1
+fi
+
+exit $ret
+</file>
+
+<file path="pitchy-bird/.git/hooks/fsmonitor-watchman.sample">
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use IPC::Open2;
+
+# An example hook script to integrate Watchman
+# (https://facebook.github.io/watchman/) with git to speed up detecting
+# new and modified files.
+#
+# The hook is passed a version (currently 2) and last update token
+# formatted as a string and outputs to stdout a new update token and
+# all files that have been modified since the update token. Paths must
+# be relative to the root of the working tree and separated by a single NUL.
+#
+# To enable this hook, rename this file to "query-watchman" and set
+# 'git config core.fsmonitor .git/hooks/query-watchman'
+#
+my ($version, $last_update_token) = @ARGV;
+
+# Uncomment for debugging
+# print STDERR "$0 $version $last_update_token\n";
+
+# Check the hook interface version
+if ($version ne 2) {
+	die "Unsupported query-fsmonitor hook version '$version'.\n" .
+	    "Falling back to scanning...\n";
+}
+
+my $git_work_tree = get_working_dir();
+
+my $json_pkg;
+eval {
+	require JSON::XS;
+	$json_pkg = "JSON::XS";
+	1;
+} or do {
+	require JSON::PP;
+	$json_pkg = "JSON::PP";
+};
+
+launch_watchman();
+
+sub launch_watchman {
+	my $o = watchman_query();
+	if (is_work_tree_watched($o)) {
+		output_result($o->{clock}, @{$o->{files}});
+	}
+}
+
+sub output_result {
+	my ($clockid, @files) = @_;
+
+	# Uncomment for debugging watchman output
+	# open (my $fh, ">", ".git/watchman-output.out");
+	# binmode $fh, ":utf8";
+	# print $fh "$clockid\n@files\n";
+	# close $fh;
+
+	binmode STDOUT, ":utf8";
+	print $clockid;
+	print "\0";
+	local $, = "\0";
+	print @files;
+}
+
+sub watchman_clock {
+	my $response = qx/watchman clock "$git_work_tree"/;
+	die "Failed to get clock id on '$git_work_tree'.\n" .
+		"Falling back to scanning...\n" if $? != 0;
+
+	return $json_pkg->new->utf8->decode($response);
+}
+
+sub watchman_query {
+	my $pid = open2(\*CHLD_OUT, \*CHLD_IN, 'watchman -j --no-pretty')
+	or die "open2() failed: $!\n" .
+	"Falling back to scanning...\n";
+
+	# In the query expression below we're asking for names of files that
+	# changed since $last_update_token but not from the .git folder.
+	#
+	# To accomplish this, we're using the "since" generator to use the
+	# recency index to select candidate nodes and "fields" to limit the
+	# output to file names only. Then we're using the "expression" term to
+	# further constrain the results.
+	my $last_update_line = "";
+	if (substr($last_update_token, 0, 1) eq "c") {
+		$last_update_token = "\"$last_update_token\"";
+		$last_update_line = qq[\n"since": $last_update_token,];
+	}
+	my $query = <<"	END";
+		["query", "$git_work_tree", {$last_update_line
+			"fields": ["name"],
+			"expression": ["not", ["dirname", ".git"]]
+		}]
+	END
+
+	# Uncomment for debugging the watchman query
+	# open (my $fh, ">", ".git/watchman-query.json");
+	# print $fh $query;
+	# close $fh;
+
+	print CHLD_IN $query;
+	close CHLD_IN;
+	my $response = do {local $/; <CHLD_OUT>};
+
+	# Uncomment for debugging the watch response
+	# open ($fh, ">", ".git/watchman-response.json");
+	# print $fh $response;
+	# close $fh;
+
+	die "Watchman: command returned no output.\n" .
+	"Falling back to scanning...\n" if $response eq "";
+	die "Watchman: command returned invalid output: $response\n" .
+	"Falling back to scanning...\n" unless $response =~ /^\{/;
+
+	return $json_pkg->new->utf8->decode($response);
+}
+
+sub is_work_tree_watched {
+	my ($output) = @_;
+	my $error = $output->{error};
+	if ($error and $error =~ m/unable to resolve root .* directory (.*) is not watched/) {
+		my $response = qx/watchman watch "$git_work_tree"/;
+		die "Failed to make watchman watch '$git_work_tree'.\n" .
+		    "Falling back to scanning...\n" if $? != 0;
+		$output = $json_pkg->new->utf8->decode($response);
+		$error = $output->{error};
+		die "Watchman: $error.\n" .
+		"Falling back to scanning...\n" if $error;
+
+		# Uncomment for debugging watchman output
+		# open (my $fh, ">", ".git/watchman-output.out");
+		# close $fh;
+
+		# Watchman will always return all files on the first query so
+		# return the fast "everything is dirty" flag to git and do the
+		# Watchman query just to get it over with now so we won't pay
+		# the cost in git to look up each individual file.
+		my $o = watchman_clock();
+		$error = $o->{error};
+
+		die "Watchman: $error.\n" .
+		"Falling back to scanning...\n" if $error;
+
+		output_result($o->{clock}, ("/"));
+		return 0;
+	}
+
+	die "Watchman: $error.\n" .
+	"Falling back to scanning...\n" if $error;
+
+	return 1;
+}
+
+sub get_working_dir {
+	my $working_dir;
+	if ($^O =~ 'msys' || $^O =~ 'cygwin') {
+		$working_dir = Win32::GetCwd();
+		$working_dir =~ tr/\\/\//;
+	} else {
+		require Cwd;
+		$working_dir = Cwd::cwd();
+	}
+
+	return $working_dir;
+}
+</file>
+
+<file path="pitchy-bird/.git/hooks/post-update.sample">
+#!/bin/sh
+#
+# An example hook script to prepare a packed repository for use over
+# dumb transports.
+#
+# To enable this hook, rename this file to "post-update".
+
+exec git update-server-info
+</file>
+
+<file path="pitchy-bird/.git/hooks/pre-applypatch.sample">
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed
+# by applypatch from an e-mail message.
+#
+# The hook should exit with non-zero status after issuing an
+# appropriate message if it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-applypatch".
+
+. git-sh-setup
+precommit="$(git rev-parse --git-path hooks/pre-commit)"
+test -x "$precommit" && exec "$precommit" ${1+"$@"}
+:
+</file>
+
+<file path="pitchy-bird/.git/hooks/pre-commit.sample">
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git commit" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message if
+# it wants to stop the commit.
+#
+# To enable this hook, rename this file to "pre-commit".
+
+if git rev-parse --verify HEAD >/dev/null 2>&1
+then
+	against=HEAD
+else
+	# Initial commit: diff against an empty tree object
+	against=$(git hash-object -t tree /dev/null)
+fi
+
+# If you want to allow non-ASCII filenames set this variable to true.
+allownonascii=$(git config --type=bool hooks.allownonascii)
+
+# Redirect output to stderr.
+exec 1>&2
+
+# Cross platform projects tend to avoid non-ASCII filenames; prevent
+# them from being added to the repository. We exploit the fact that the
+# printable range starts at the space character and ends with tilde.
+if [ "$allownonascii" != "true" ] &&
+	# Note that the use of brackets around a tr range is ok here, (it's
+	# even required, for portability to Solaris 10's /usr/bin/tr), since
+	# the square bracket bytes happen to fall in the designated range.
+	test $(git diff-index --cached --name-only --diff-filter=A -z $against |
+	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+then
+	cat <<\EOF
+Error: Attempt to add a non-ASCII file name.
+
+This can cause problems if you want to work with people on other platforms.
+
+To be portable it is advisable to rename the file.
+
+If you know what you are doing you can disable this check using:
+
+  git config hooks.allownonascii true
+EOF
+	exit 1
+fi
+
+# If there are whitespace errors, print the offending file names and fail.
+exec git diff-index --check --cached $against --
+</file>
+
+<file path="pitchy-bird/.git/hooks/pre-merge-commit.sample">
+#!/bin/sh
+#
+# An example hook script to verify what is about to be committed.
+# Called by "git merge" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message to
+# stderr if it wants to stop the merge commit.
+#
+# To enable this hook, rename this file to "pre-merge-commit".
+
+. git-sh-setup
+test -x "$GIT_DIR/hooks/pre-commit" &&
+        exec "$GIT_DIR/hooks/pre-commit"
+:
+</file>
+
+<file path="pitchy-bird/.git/hooks/pre-push.sample">
+#!/bin/sh
+
+# An example hook script to verify what is about to be pushed.  Called by "git
+# push" after it has checked the remote status, but before anything has been
+# pushed.  If this script exits with a non-zero status nothing will be pushed.
+#
+# This hook is called with the following parameters:
+#
+# $1 -- Name of the remote to which the push is being done
+# $2 -- URL to which the push is being done
+#
+# If pushing without using a named remote those arguments will be equal.
+#
+# Information about the commits which are being pushed is supplied as lines to
+# the standard input in the form:
+#
+#   <local ref> <local oid> <remote ref> <remote oid>
+#
+# This sample shows how to prevent push of commits where the log message starts
+# with "WIP" (work in progress).
+
+remote="$1"
+url="$2"
+
+zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
+
+while read local_ref local_oid remote_ref remote_oid
+do
+	if test "$local_oid" = "$zero"
+	then
+		# Handle delete
+		:
+	else
+		if test "$remote_oid" = "$zero"
+		then
+			# New branch, examine all commits
+			range="$local_oid"
+		else
+			# Update to existing branch, examine new commits
+			range="$remote_oid..$local_oid"
+		fi
+
+		# Check for WIP commit
+		commit=$(git rev-list -n 1 --grep '^WIP' "$range")
+		if test -n "$commit"
+		then
+			echo >&2 "Found WIP commit in $local_ref, not pushing"
+			exit 1
+		fi
+	fi
+done
+
+exit 0
+</file>
+
+<file path="pitchy-bird/.git/hooks/pre-rebase.sample">
+#!/bin/sh
+#
+# Copyright (c) 2006, 2008 Junio C Hamano
+#
+# The "pre-rebase" hook is run just before "git rebase" starts doing
+# its job, and can prevent the command from running by exiting with
+# non-zero status.
+#
+# The hook is called with the following parameters:
+#
+# $1 -- the upstream the series was forked from.
+# $2 -- the branch being rebased (or empty when rebasing the current branch).
+#
+# This sample shows how to prevent topic branches that are already
+# merged to 'next' branch from getting rebased, because allowing it
+# would result in rebasing already published history.
+
+publish=next
+basebranch="$1"
+if test "$#" = 2
+then
+	topic="refs/heads/$2"
+else
+	topic=`git symbolic-ref HEAD` ||
+	exit 0 ;# we do not interrupt rebasing detached HEAD
+fi
+
+case "$topic" in
+refs/heads/??/*)
+	;;
+*)
+	exit 0 ;# we do not interrupt others.
+	;;
+esac
+
+# Now we are dealing with a topic branch being rebased
+# on top of master.  Is it OK to rebase it?
+
+# Does the topic really exist?
+git show-ref -q "$topic" || {
+	echo >&2 "No such branch $topic"
+	exit 1
+}
+
+# Is topic fully merged to master?
+not_in_master=`git rev-list --pretty=oneline ^master "$topic"`
+if test -z "$not_in_master"
+then
+	echo >&2 "$topic is fully merged to master; better remove it."
+	exit 1 ;# we could allow it, but there is no point.
+fi
+
+# Is topic ever merged to next?  If so you should not be rebasing it.
+only_next_1=`git rev-list ^master "^$topic" ${publish} | sort`
+only_next_2=`git rev-list ^master           ${publish} | sort`
+if test "$only_next_1" = "$only_next_2"
+then
+	not_in_topic=`git rev-list "^$topic" master`
+	if test -z "$not_in_topic"
+	then
+		echo >&2 "$topic is already up to date with master"
+		exit 1 ;# we could allow it, but there is no point.
+	else
+		exit 0
+	fi
+else
+	not_in_next=`git rev-list --pretty=oneline ^${publish} "$topic"`
+	/usr/bin/perl -e '
+		my $topic = $ARGV[0];
+		my $msg = "* $topic has commits already merged to public branch:\n";
+		my (%not_in_next) = map {
+			/^([0-9a-f]+) /;
+			($1 => 1);
+		} split(/\n/, $ARGV[1]);
+		for my $elem (map {
+				/^([0-9a-f]+) (.*)$/;
+				[$1 => $2];
+			} split(/\n/, $ARGV[2])) {
+			if (!exists $not_in_next{$elem->[0]}) {
+				if ($msg) {
+					print STDERR $msg;
+					undef $msg;
+				}
+				print STDERR " $elem->[1]\n";
+			}
+		}
+	' "$topic" "$not_in_next" "$not_in_master"
+	exit 1
+fi
+
+<<\DOC_END
+
+This sample hook safeguards topic branches that have been
+published from being rewound.
+
+The workflow assumed here is:
+
+ * Once a topic branch forks from "master", "master" is never
+   merged into it again (either directly or indirectly).
+
+ * Once a topic branch is fully cooked and merged into "master",
+   it is deleted.  If you need to build on top of it to correct
+   earlier mistakes, a new topic branch is created by forking at
+   the tip of the "master".  This is not strictly necessary, but
+   it makes it easier to keep your history simple.
+
+ * Whenever you need to test or publish your changes to topic
+   branches, merge them into "next" branch.
+
+The script, being an example, hardcodes the publish branch name
+to be "next", but it is trivial to make it configurable via
+$GIT_DIR/config mechanism.
+
+With this workflow, you would want to know:
+
+(1) ... if a topic branch has ever been merged to "next".  Young
+    topic branches can have stupid mistakes you would rather
+    clean up before publishing, and things that have not been
+    merged into other branches can be easily rebased without
+    affecting other people.  But once it is published, you would
+    not want to rewind it.
+
+(2) ... if a topic branch has been fully merged to "master".
+    Then you can delete it.  More importantly, you should not
+    build on top of it -- other people may already want to
+    change things related to the topic as patches against your
+    "master", so if you need further changes, it is better to
+    fork the topic (perhaps with the same name) afresh from the
+    tip of "master".
+
+Let's look at this example:
+
+		   o---o---o---o---o---o---o---o---o---o "next"
+		  /       /           /           /
+		 /   a---a---b A     /           /
+		/   /               /           /
+	       /   /   c---c---c---c B         /
+	      /   /   /             \         /
+	     /   /   /   b---b C     \       /
+	    /   /   /   /             \     /
+    ---o---o---o---o---o---o---o---o---o---o---o "master"
+
+
+A, B and C are topic branches.
+
+ * A has one fix since it was merged up to "next".
+
+ * B has finished.  It has been fully merged up to "master" and "next",
+   and is ready to be deleted.
+
+ * C has not merged to "next" at all.
+
+We would want to allow C to be rebased, refuse A, and encourage
+B to be deleted.
+
+To compute (1):
+
+	git rev-list ^master ^topic next
+	git rev-list ^master        next
+
+	if these match, topic has not merged in next at all.
+
+To compute (2):
+
+	git rev-list master..topic
+
+	if this is empty, it is fully merged to "master".
+
+DOC_END
+</file>
+
+<file path="pitchy-bird/.git/hooks/pre-receive.sample">
+#!/bin/sh
+#
+# An example hook script to make use of push options.
+# The example simply echoes all push options that start with 'echoback='
+# and rejects all pushes when the "reject" push option is used.
+#
+# To enable this hook, rename this file to "pre-receive".
+
+if test -n "$GIT_PUSH_OPTION_COUNT"
+then
+	i=0
+	while test "$i" -lt "$GIT_PUSH_OPTION_COUNT"
+	do
+		eval "value=\$GIT_PUSH_OPTION_$i"
+		case "$value" in
+		echoback=*)
+			echo "echo from the pre-receive-hook: ${value#*=}" >&2
+			;;
+		reject)
+			exit 1
+		esac
+		i=$((i + 1))
+	done
+fi
+</file>
+
+<file path="pitchy-bird/.git/hooks/prepare-commit-msg.sample">
+#!/bin/sh
+#
+# An example hook script to prepare the commit log message.
+# Called by "git commit" with the name of the file that has the
+# commit message, followed by the description of the commit
+# message's source.  The hook's purpose is to edit the commit
+# message file.  If the hook fails with a non-zero status,
+# the commit is aborted.
+#
+# To enable this hook, rename this file to "prepare-commit-msg".
+
+# This hook includes three examples. The first one removes the
+# "# Please enter the commit message..." help message.
+#
+# The second includes the output of "git diff --name-status -r"
+# into the message, just before the "git status" output.  It is
+# commented because it doesn't cope with --amend or with squashed
+# commits.
+#
+# The third example adds a Signed-off-by line to the message, that can
+# still be edited.  This is rarely a good idea.
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+SHA1=$3
+
+/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
+
+# case "$COMMIT_SOURCE,$SHA1" in
+#  ,|template,)
+#    /usr/bin/perl -i.bak -pe '
+#       print "\n" . `git diff --cached --name-status -r`
+# 	 if /^#/ && $first++ == 0' "$COMMIT_MSG_FILE" ;;
+#  *) ;;
+# esac
+
+# SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
+# git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
+# if test -z "$COMMIT_SOURCE"
+# then
+#   /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
+# fi
+</file>
+
+<file path="pitchy-bird/.git/hooks/push-to-checkout.sample">
+#!/bin/sh
+
+# An example hook script to update a checked-out tree on a git push.
+#
+# This hook is invoked by git-receive-pack(1) when it reacts to git
+# push and updates reference(s) in its repository, and when the push
+# tries to update the branch that is currently checked out and the
+# receive.denyCurrentBranch configuration variable is set to
+# updateInstead.
+#
+# By default, such a push is refused if the working tree and the index
+# of the remote repository has any difference from the currently
+# checked out commit; when both the working tree and the index match
+# the current commit, they are updated to match the newly pushed tip
+# of the branch. This hook is to be used to override the default
+# behaviour; however the code below reimplements the default behaviour
+# as a starting point for convenient modification.
+#
+# The hook receives the commit with which the tip of the current
+# branch is going to be updated:
+commit=$1
+
+# It can exit with a non-zero status to refuse the push (when it does
+# so, it must not modify the index or the working tree).
+die () {
+	echo >&2 "$*"
+	exit 1
+}
+
+# Or it can make any necessary changes to the working tree and to the
+# index to bring them to the desired state when the tip of the current
+# branch is updated to the new commit, and exit with a zero status.
+#
+# For example, the hook can simply run git read-tree -u -m HEAD "$1"
+# in order to emulate git fetch that is run in the reverse direction
+# with git push, as the two-tree form of git read-tree -u -m is
+# essentially the same as git switch or git checkout that switches
+# branches while keeping the local changes in the working tree that do
+# not interfere with the difference between the branches.
+
+# The below is a more-or-less exact translation to shell of the C code
+# for the default behaviour for git's push-to-checkout hook defined in
+# the push_to_deploy() function in builtin/receive-pack.c.
+#
+# Note that the hook will be executed from the repository directory,
+# not from the working tree, so if you want to perform operations on
+# the working tree, you will have to adapt your code accordingly, e.g.
+# by adding "cd .." or using relative paths.
+
+if ! git update-index -q --ignore-submodules --refresh
+then
+	die "Up-to-date check failed"
+fi
+
+if ! git diff-files --quiet --ignore-submodules --
+then
+	die "Working directory has unstaged changes"
+fi
+
+# This is a rough translation of:
+#
+#   head_has_history() ? "HEAD" : EMPTY_TREE_SHA1_HEX
+if git cat-file -e HEAD 2>/dev/null
+then
+	head=HEAD
+else
+	head=$(git hash-object -t tree --stdin </dev/null)
+fi
+
+if ! git diff-index --quiet --cached --ignore-submodules $head --
+then
+	die "Working directory has staged changes"
+fi
+
+if ! git read-tree -u -m "$commit"
+then
+	die "Could not update working tree to new HEAD"
+fi
+</file>
+
+<file path="pitchy-bird/.git/hooks/sendemail-validate.sample">
+#!/bin/sh
+
+# An example hook script to validate a patch (and/or patch series) before
+# sending it via email.
+#
+# The hook should exit with non-zero status after issuing an appropriate
+# message if it wants to prevent the email(s) from being sent.
+#
+# To enable this hook, rename this file to "sendemail-validate".
+#
+# By default, it will only check that the patch(es) can be applied on top of
+# the default upstream branch without conflicts in a secondary worktree. After
+# validation (successful or not) of the last patch of a series, the worktree
+# will be deleted.
+#
+# The following config variables can be set to change the default remote and
+# remote ref that are used to apply the patches against:
+#
+#   sendemail.validateRemote (default: origin)
+#   sendemail.validateRemoteRef (default: HEAD)
+#
+# Replace the TODO placeholders with appropriate checks according to your
+# needs.
+
+validate_cover_letter () {
+	file="$1"
+	# TODO: Replace with appropriate checks (e.g. spell checking).
+	true
+}
+
+validate_patch () {
+	file="$1"
+	# Ensure that the patch applies without conflicts.
+	git am -3 "$file" || return
+	# TODO: Replace with appropriate checks for this patch
+	# (e.g. checkpatch.pl).
+	true
+}
+
+validate_series () {
+	# TODO: Replace with appropriate checks for the whole series
+	# (e.g. quick build, coding style checks, etc.).
+	true
+}
+
+# main -------------------------------------------------------------------------
+
+if test "$GIT_SENDEMAIL_FILE_COUNTER" = 1
+then
+	remote=$(git config --default origin --get sendemail.validateRemote) &&
+	ref=$(git config --default HEAD --get sendemail.validateRemoteRef) &&
+	worktree=$(mktemp --tmpdir -d sendemail-validate.XXXXXXX) &&
+	git worktree add -fd --checkout "$worktree" "refs/remotes/$remote/$ref" &&
+	git config --replace-all sendemail.validateWorktree "$worktree"
+else
+	worktree=$(git config --get sendemail.validateWorktree)
+fi || {
+	echo "sendemail-validate: error: failed to prepare worktree" >&2
+	exit 1
+}
+
+unset GIT_DIR GIT_WORK_TREE
+cd "$worktree" &&
+
+if grep -q "^diff --git " "$1"
+then
+	validate_patch "$1"
+else
+	validate_cover_letter "$1"
+fi &&
+
+if test "$GIT_SENDEMAIL_FILE_COUNTER" = "$GIT_SENDEMAIL_FILE_TOTAL"
+then
+	git config --unset-all sendemail.validateWorktree &&
+	trap 'git worktree remove -ff "$worktree"' EXIT &&
+	validate_series
+fi
+</file>
+
+<file path="pitchy-bird/.git/hooks/update.sample">
+#!/bin/sh
+#
+# An example hook script to block unannotated tags from entering.
+# Called by "git receive-pack" with arguments: refname sha1-old sha1-new
+#
+# To enable this hook, rename this file to "update".
+#
+# Config
+# ------
+# hooks.allowunannotated
+#   This boolean sets whether unannotated tags will be allowed into the
+#   repository.  By default they won't be.
+# hooks.allowdeletetag
+#   This boolean sets whether deleting tags will be allowed in the
+#   repository.  By default they won't be.
+# hooks.allowmodifytag
+#   This boolean sets whether a tag may be modified after creation. By default
+#   it won't be.
+# hooks.allowdeletebranch
+#   This boolean sets whether deleting branches will be allowed in the
+#   repository.  By default they won't be.
+# hooks.denycreatebranch
+#   This boolean sets whether remotely creating branches will be denied
+#   in the repository.  By default this is allowed.
+#
+
+# --- Command line
+refname="$1"
+oldrev="$2"
+newrev="$3"
+
+# --- Safety check
+if [ -z "$GIT_DIR" ]; then
+	echo "Don't run this script from the command line." >&2
+	echo " (if you want, you could supply GIT_DIR then run" >&2
+	echo "  $0 <ref> <oldrev> <newrev>)" >&2
+	exit 1
+fi
+
+if [ -z "$refname" -o -z "$oldrev" -o -z "$newrev" ]; then
+	echo "usage: $0 <ref> <oldrev> <newrev>" >&2
+	exit 1
+fi
+
+# --- Config
+allowunannotated=$(git config --type=bool hooks.allowunannotated)
+allowdeletebranch=$(git config --type=bool hooks.allowdeletebranch)
+denycreatebranch=$(git config --type=bool hooks.denycreatebranch)
+allowdeletetag=$(git config --type=bool hooks.allowdeletetag)
+allowmodifytag=$(git config --type=bool hooks.allowmodifytag)
+
+# check for no description
+projectdesc=$(sed -e '1q' "$GIT_DIR/description")
+case "$projectdesc" in
+"Unnamed repository"* | "")
+	echo "*** Project description file hasn't been set" >&2
+	exit 1
+	;;
+esac
+
+# --- Check types
+# if $newrev is 0000...0000, it's a commit to delete a ref.
+zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
+if [ "$newrev" = "$zero" ]; then
+	newrev_type=delete
+else
+	newrev_type=$(git cat-file -t $newrev)
+fi
+
+case "$refname","$newrev_type" in
+	refs/tags/*,commit)
+		# un-annotated tag
+		short_refname=${refname##refs/tags/}
+		if [ "$allowunannotated" != "true" ]; then
+			echo "*** The un-annotated tag, $short_refname, is not allowed in this repository" >&2
+			echo "*** Use 'git tag [ -a | -s ]' for tags you want to propagate." >&2
+			exit 1
+		fi
+		;;
+	refs/tags/*,delete)
+		# delete tag
+		if [ "$allowdeletetag" != "true" ]; then
+			echo "*** Deleting a tag is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	refs/tags/*,tag)
+		# annotated tag
+		if [ "$allowmodifytag" != "true" ] && git rev-parse $refname > /dev/null 2>&1
+		then
+			echo "*** Tag '$refname' already exists." >&2
+			echo "*** Modifying a tag is not allowed in this repository." >&2
+			exit 1
+		fi
+		;;
+	refs/heads/*,commit)
+		# branch
+		if [ "$oldrev" = "$zero" -a "$denycreatebranch" = "true" ]; then
+			echo "*** Creating a branch is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	refs/heads/*,delete)
+		# delete branch
+		if [ "$allowdeletebranch" != "true" ]; then
+			echo "*** Deleting a branch is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	refs/remotes/*,commit)
+		# tracking branch
+		;;
+	refs/remotes/*,delete)
+		# delete tracking branch
+		if [ "$allowdeletebranch" != "true" ]; then
+			echo "*** Deleting a tracking branch is not allowed in this repository" >&2
+			exit 1
+		fi
+		;;
+	*)
+		# Anything else (is there anything else?)
+		echo "*** Update hook: unknown type of update to ref $refname of type $newrev_type" >&2
+		exit 1
+		;;
+esac
+
+# --- Finished
+exit 0
+</file>
+
+<file path="pitchy-bird/.git/info/exclude">
+# git ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+# For a project mostly in C, the following would be a good set of
+# exclude patterns (uncomment them if you want to use them):
+# *.[oa]
+# *~
+</file>
+
+<file path="pitchy-bird/.git/logs/refs/heads/main">
+0000000000000000000000000000000000000000 37459cd42c0589f6c110794bc04c4dd8893415c0 Elcan <elcan.hasanov08@mail.ru> 1785252380 +0400	clone: from https://github.com/Vugar-Abdullayev/pitchy-bird.git
+</file>
+
+<file path="pitchy-bird/.git/logs/refs/remotes/origin/HEAD">
+0000000000000000000000000000000000000000 37459cd42c0589f6c110794bc04c4dd8893415c0 Elcan <elcan.hasanov08@mail.ru> 1785252380 +0400	clone: from https://github.com/Vugar-Abdullayev/pitchy-bird.git
+</file>
+
+<file path="pitchy-bird/.git/logs/HEAD">
+0000000000000000000000000000000000000000 37459cd42c0589f6c110794bc04c4dd8893415c0 Elcan <elcan.hasanov08@mail.ru> 1785252380 +0400	clone: from https://github.com/Vugar-Abdullayev/pitchy-bird.git
+</file>
+
+<file path="pitchy-bird/.git/refs/heads/main">
+37459cd42c0589f6c110794bc04c4dd8893415c0
+</file>
+
+<file path="pitchy-bird/.git/refs/remotes/origin/HEAD">
+ref: refs/remotes/origin/main
+</file>
+
+<file path="pitchy-bird/.git/config">
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/Vugar-Abdullayev/pitchy-bird.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
+	vscode-merge-base = origin/main
+</file>
+
+<file path="pitchy-bird/.git/description">
+Unnamed repository; edit this file 'description' to name the repository.
+</file>
+
+<file path="pitchy-bird/.git/HEAD">
+ref: refs/heads/main
+</file>
+
+<file path="pitchy-bird/.git/packed-refs">
+# pack-refs with: peeled fully-peeled sorted 
+37459cd42c0589f6c110794bc04c4dd8893415c0 refs/remotes/origin/main
+</file>
+
+<file path="pitchy-bird/dist/assets/index-BqqKQ1aD.js">
+(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))i(s);new MutationObserver(s=>{for(const r of s)if(r.type==="childList")for(const o of r.addedNodes)o.tagName==="LINK"&&o.rel==="modulepreload"&&i(o)}).observe(document,{childList:!0,subtree:!0});function e(s){const r={};return s.integrity&&(r.integrity=s.integrity),s.referrerPolicy&&(r.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?r.credentials="include":s.crossOrigin==="anonymous"?r.credentials="omit":r.credentials="same-origin",r}function i(s){if(s.ep)return;s.ep=!0;const r=e(s);fetch(s.href,r)}})();const f=[{name:"G3",freq:196},{name:"A3",freq:220},{name:"B3",freq:246.94},{name:"C4",freq:261.63},{name:"D4",freq:293.66},{name:"E4",freq:329.63},{name:"F#4",freq:369.99},{name:"G4",freq:392},{name:"A4",freq:440},{name:"B4",freq:493.88},{name:"C5",freq:523.25},{name:"D5",freq:587.33},{name:"E5",freq:659.25}],b=f[0].freq*.94,A=f[f.length-1].freq*1.06,S=.5;function L(h){return!h||h<=0?null:69+12*Math.log2(h/440)}function k(h){return 440*Math.pow(2,(h-69)/12)}function T(h,t,e){const i=Math.max(b,Math.min(A,h)),s=(Math.log2(i)-Math.log2(b))/(Math.log2(A)-Math.log2(b));return e-s*(e-t)}class W{constructor(){this.audioContext=null,this.analyser=null,this.source=null,this.stream=null,this.buffers=[],this.maxBuffers=4,this.minConfidence=10,this.currentFreq=0,this.lastValidFreq=0,this.confidence=0,this.hysteresis=0,this.silentFrames=0,this.lastStrongFreq=0,this.smoothingFactor=.4,this.octaveRatioMin=.45,this.octaveRatioMax=2.2,this.invOctaveRatioMax=1/this.octaveRatioMin,this.minFrequency=196,this.maxFrequency=659,this.isActive=!1,this._debugFrame=0}async start(){if(!(this.audioContext&&this.audioContext.state!=="closed")){if(!window.AudioContext&&!window.webkitAudioContext)throw new Error(" AudioContext not supported in this browser");try{return this.audioContext=new(window.AudioContext||window.webkitAudioContext),this.audioContext.state==="suspended"&&await this.audioContext.resume(),this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:!1,noiseSuppression:!1,autoGainControl:!1}}),console.log("[PitchDetector] getUserMedia OK — sampleRate:",this.audioContext.sampleRate,"tracks:",this.stream.getAudioTracks().map(t=>t.label)),this.source=this.audioContext.createMediaStreamSource(this.stream),this.analyser=this.audioContext.createAnalyser(),this.analyser.fftSize=2048,this.analyser.smoothingTimeConstant=.7,this.analyser.minDecibels=-170,this.analyser.maxDecibels=-30,this.source.connect(this.analyser),this.dataBuffer=new Float32Array(this.analyser.fftSize),this.buffers=[],this.currentFreq=0,this.lastValidFreq=0,this.confidence=0,this.hysteresis=0,this.silentFrames=0,this.lastStrongFreq=0,this.isActive=!0,this.autoCorrelate(),this.isActive}catch(t){throw console.error(" Failed to initialize microphone:",t),this.isActive=!1,t}}}autoCorrelate(){!this.isActive||!this.analyser||requestAnimationFrame(()=>{const t=this.dataBuffer;this.analyser.getFloatTimeDomainData(t);const e=this.correlate(t,this.audioContext.sampleRate);this._debugFrame++,this._debugFrame%30===0&&console.log("[PitchDetector] frame",this._debugFrame,"| bufferLength:",t.length,"| raw freq:",e.frequency?e.frequency.toFixed(1):e.frequency,"| confidence:",e.confidence?e.confidence.toFixed(2):e.confidence),this.processFrequencyData(e),this.autoCorrelate()})}correlate(t,e){const i=t.length;let s=0;for(let n=0;n<i;n++)s+=t[n]*t[n];if(s=Math.sqrt(s/i),s<.012)return{frequency:0,confidence:0};let r=0,o=i-1;const p=.2;for(let n=0;n<i/2;n++)if(Math.abs(t[n])<p){r=n;break}for(let n=1;n<i/2;n++)if(Math.abs(t[i-n])<p){o=i-n;break}const g=t.slice(r,o),a=g.length;if(a<8)return{frequency:0,confidence:0};const c=new Float32Array(a);for(let n=0;n<a;n++){let w=0;for(let m=0;m<a-n;m++)w+=g[m]*g[m+n];c[n]=w}let l=0;for(;l<a-1&&c[l]>c[l+1];)l++;let x=-1,d=-1;for(let n=l;n<a;n++)c[n]>x&&(x=c[n],d=n);if(d<=0)return{frequency:0,confidence:0};let D=d;if(d>0&&d<a-1){const n=c[d-1],w=c[d],m=c[d+1],N=(n+m-2*w)/2,Y=(m-n)/2;N!==0&&(D=d-Y/(2*N))}const v=e/D;if(v<60||v>1500)return{frequency:0,confidence:0};const H=c[0]>0?x/c[0]*100:0;return{frequency:v,confidence:H}}processFrequencyData(t){const{frequency:e,confidence:i}=t;if(!e||e<this.minFrequency||e>this.maxFrequency){this.silentFrames++,this.silentFrames>=3&&(this.hysteresis=0,this.currentFreq=0);return}this.silentFrames=0;const s=e/(this.lastStrongFreq||1),r=1/s,o=s>this.octaveRatioMax||s<this.octaveRatioMin||r>this.invOctaveRatioMax;i>this.minConfidence&&!o?(this.hysteresis=Math.max(0,this.hysteresis-1),this.hysteresis===0&&(this.lastStrongFreq=e,this.currentFreq=this.currentFreq?this.smoothingFactor*e+(1-this.smoothingFactor)*this.currentFreq:e,this.confidence=i,this.lastValidFreq=e)):this.hysteresis=Math.min(5,this.hysteresis+1)}getReading(){const t=this.currentFreq||this.lastValidFreq||0;return{frequency:t,midiNote:t?Math.round(X(t)):null,confidence:this.confidence,timestamp:Date.now()}}stop(){this.isActive=!1,this.source&&this.source.disconnect(),this.analyser&&this.analyser.disconnect(),this.stream&&this.stream.getTracks().forEach(t=>t.stop()),this.audioContext&&this.audioContext.state!=="closed"&&this.audioContext.close()}}function X(h){return 69+12*Math.log2(h/440)}class z{constructor(t,e=S){this.notes=t||f,this.tolerance=e}freqToMidi(t){return!t||t<=0?null:69+12*Math.log2(t/440)}getRequiredNote(t){return t.note}getSemitoneDiff(t,e){if(!t||!e)return 1/0;const i=this.freqToMidi(t),s=this.freqToMidi(e);return Math.abs(i-s)}isWithinTolerance(t,e){return t===null||e===null?!1:Math.abs(t-e)<=this.tolerance}getNearestNote(t){if(!t||t<=0)return null;const e=this.freqToMidi(t);return this.notes.find(i=>Math.abs(this.freqToMidi(i.freq)-e)<.5)||this.notes[0]}evaluate(t,e){if(!t||!e)return{pass:!1,diff:1/0,within:!1};const i=this.freqToMidi(e.freq),s=this.freqToMidi(t.frequency),r=Math.abs(s-i),o=r<=this.tolerance;return{pass:o,diff:r,within:o,readingMidi:s,targetMidi:i}}freqToMidiNumber(t){return L(t)}midiToFrequency(t){return k(t)}}class _{constructor(t={}){this.width=t.width||720,this.height=t.height||480,this.playTop=24,this.playBottom=this.height-24,this.birdRadius=14,this.birdX=150,this.y=this.height/2,this.targetY=this.height/2,this.velocity=0,this.smoothingFactor=.12,this.gravity=.018,this.maxFallSpeed=2.5,this.filteredFreq=0,this.freqHistory=[],this.maxHistory=5,this.lastReading=null}reset(){this.y=this.height/2,this.targetY=this.height/2,this.velocity=0,this.filteredFreq=0,this.freqHistory=[],this.lastReading=null}update(t,e){const i=t/1e3;if(this.lastReading=e,e&&e.frequency>0){this.filteredFreq=e.frequency,this.freqHistory.push(e.frequency),this.freqHistory.length>this.maxHistory&&this.freqHistory.shift();const r=this.getMedian(this.freqHistory)||this.filteredFreq,o=T(r,this.playTop,this.playBottom);this.targetY=Math.max(this.playTop+this.birdRadius,Math.min(this.playBottom-this.birdRadius,o))}else this.velocity+=this.gravity*i*60,this.velocity=Math.min(this.velocity,this.maxFallSpeed);this.y+=(this.targetY-this.y)*this.smoothingFactor+this.velocity*i*60,this.y=Math.max(this.playTop+this.birdRadius,Math.min(this.playBottom-this.birdRadius,this.y))}getMedian(t){if(!t.length)return 0;const e=[...t].sort((s,r)=>s-r),i=Math.floor(e.length/2);return e.length%2!==0?e[i]:(e[i-1]+e[i])/2}getY(){return this.y}getTargetY(){return this.targetY}getX(){return this.birdX}getRadius(){return this.birdRadius}getFilteredFrequency(){return this.filteredFreq}isAlive(){return this.y>=this.playTop+this.birdRadius&&this.y<=this.playBottom-this.birdRadius}}class ${constructor(t,e={}){this.notes=t||f,this.width=e.width||720,this.height=e.height||480,this.playTop=24,this.playBottom=this.height-24,this.pipeWidth=46,this.pipeGap=140,this.pipeSpeed=2.6,this.spawnX=this.width+40,this.list=[],this.passedNote=null,this.difficulty=0}reset(){this.list=[],this.pipeSpeed=2.6,this.difficulty=0,this.spawnPipe()}spawnPipe(){const t=this.notes[Math.floor(Math.random()*this.notes.length)],e=T(t.freq,this.playTop,this.playBottom);this.list.push({x:this.spawnX,note:t,gapCenterY:e,passed:!1})}update(t){const e=this.pipeSpeed+this.difficulty*.1;this.list.forEach(i=>{i.x-=e}),this.list.length&&this.list[this.list.length-1].x<this.width-280&&this.spawnPipe(),this.list=this.list.filter(i=>i.x>-this.pipeWidth-20)}increaseDifficulty(){this.difficulty=Math.min(5,this.difficulty+1),this.pipeSpeed=Math.min(5.2,this.pipeSpeed+.06)}getGapTop(t){return t.gapCenterY-this.pipeGap/2}getGapBottom(t){return t.gapCenterY+this.pipeGap/2}getCurrentRequiredNote(){for(const t of this.list)if(t.x>0&&t.x<this.spawnX)return t.note;return null}}class V{constructor(t,e=S){this.noteMatcher=t,this.tolerance=e,this.lastSemitoneDiff=1/0,this.lastPass=!1,this.readingHistory=[],this.windowMs=280}reset(){this.lastSemitoneDiff=1/0,this.lastPass=!1,this.readingHistory=[]}recordReading(t,e){t&&t.frequency>0&&this.readingHistory.push({timestamp:t.timestamp||e,frequency:t.frequency});const i=e-this.windowMs;for(;this.readingHistory.length&&this.readingHistory[0].timestamp<i;)this.readingHistory.shift()}medianSemitoneDiff(t){const e=this.readingHistory.filter(r=>r.frequency>0).map(r=>this.noteMatcher.getSemitoneDiff(r.frequency,t));if(!e.length)return 1/0;const i=[...e].sort((r,o)=>r-o),s=Math.floor(i.length/2);return i.length%2!==0?i[s]:(i[s-1]+i[s])/2}evaluate(t,e){const i=Date.now(),s=t.lastReading;this.recordReading(s,i);const r=t.getY(),o=t.getRadius();let p=!1,g=!1;for(const a of e.list){if(t.birdX+o>a.x&&t.birdX-o<a.x+e.pipeWidth){const l=e.getGapTop(a),x=e.getGapBottom(a);if(r-o<l||r+o>x){p=!0;break}}if(!a.passed&&a.x+e.pipeWidth<t.birdX-o){a.passed=!0;const l=this.medianSemitoneDiff(a.note.freq);this.lastSemitoneDiff=l,this.lastPass=l<=this.tolerance,this.lastPass?g=!0:p=!0}}return{collided:p,passedPipe:g,semitoneDiff:this.lastSemitoneDiff,passed:this.lastPass}}getLastSemitoneDiff(){return this.lastSemitoneDiff}}class U{constructor(t,e={}){this.canvas=t,this.ctx=t.getContext("2d"),this.width=e.width||t.width,this.height=e.height||t.height,this.noteMarginL=46,this.playTop=24,this.playBottom=this.height-24,this.pipeGap=140,this.pipeWidth=46,this.birdRadius=14,this.birdX=150}renderStatic(t){this.ctx.clearRect(0,0,this.width,this.height),this.drawStaff(t)}render({bird:t,pipes:e,reading:i,requiredNote:s}){this.ctx.clearRect(0,0,this.width,this.height),this.drawStaff(f),this.drawPipes(e,s),this.drawBird(t,i)}drawStaff(t){this.ctx.save(),this.ctx.strokeStyle="rgba(59,42,32,0.28)",this.ctx.lineWidth=1,this.ctx.font="13px 'EB Garamond', serif",this.ctx.fillStyle="rgba(59,42,32,0.65)",this.ctx.textAlign="left",this.ctx.textBaseline="middle",t.forEach(e=>{const i=T(e.freq,this.playTop,this.playBottom);this.ctx.beginPath(),this.ctx.moveTo(this.noteMarginL,i),this.ctx.lineTo(this.width-10,i),this.ctx.stroke(),this.ctx.fillText(e.name,8,i)}),this.ctx.restore()}drawPipes(t,e){t.forEach(i=>this.drawPipe(i))}drawPipe(t){const e=t.gapCenterY-this.pipeGap/2,i=t.gapCenterY+this.pipeGap/2;this.ctx.save();const s=this.ctx.createLinearGradient(t.x,0,t.x+this.pipeWidth,0);s.addColorStop(0,"#6b4a36"),s.addColorStop(.5,"#5C4030"),s.addColorStop(1,"#4a3226"),this.ctx.fillStyle=s,this.ctx.fillRect(t.x,this.playTop-10,this.pipeWidth,Math.max(0,e-(this.playTop-10))),this.ctx.fillRect(t.x,i,this.pipeWidth,Math.max(0,this.playBottom+10-i)),this.ctx.fillStyle="#3E2A1F",this.ctx.fillRect(t.x-3,e-14,this.pipeWidth+6,14),this.ctx.fillRect(t.x-3,i,this.pipeWidth+6,14),this.ctx.fillStyle="#7A2333",this.ctx.font="bold 15px 'Cormorant Garamond', serif",this.ctx.textAlign="center",this.ctx.textBaseline="middle",this.ctx.fillText(t.note.name,t.x+this.pipeWidth/2,t.gapCenterY),this.ctx.restore()}drawBird(t,e){const i=e&&e.frequency>0;this.ctx.save(),this.ctx.translate(t.birdX,t.y),this.ctx.fillStyle=i?"#C9A44C":"#9c8256",this.ctx.strokeStyle="#3E2A1F",this.ctx.lineWidth=1.5,this.ctx.beginPath(),this.ctx.ellipse(0,8,9,6.5,-.35,0,Math.PI*2),this.ctx.fill(),this.ctx.stroke(),this.ctx.beginPath(),this.ctx.moveTo(7,4),this.ctx.lineTo(7,-24),this.ctx.lineTo(10,-24),this.ctx.quadraticCurveTo(16,-16,9,-8),this.ctx.lineTo(9,4),this.ctx.closePath(),this.ctx.fill(),this.ctx.stroke(),this.ctx.restore()}}class K{constructor(){this.scoreEl=document.getElementById("scoreEl"),this.pitchEl=document.getElementById("pitchEl"),this.startOverlay=document.getElementById("startOverlay"),this.overOverlay=document.getElementById("overOverlay"),this.finalScore=document.getElementById("finalScore"),this.overNote=document.getElementById("overNote"),this.micStatus=document.getElementById("micStatus"),this.legend=document.getElementById("legend"),this.startBtn=document.getElementById("startBtn"),this.retryBtn=document.getElementById("retryBtn"),this.currentScore=0}setScore(t){this.scoreEl.textContent=t}setMicStatus(t){this.micStatus.textContent=t}hideOverlays(){this.startOverlay.style.display="none",this.overOverlay.style.display="none"}showGameOver(t){this.overOverlay.style.display="flex",this.finalScore.textContent=t,this.overNote.textContent=t===0?"Boruların arasından keçmək üçün lazımi notanı dəqiq tut.":"Yaxşı nəticə! Diapazonu genişləndirmək üçün yenidən cəhd et."}updateDebug(t){if(!this.pitchEl)return;const e=t.rawFrequency?Math.round(t.rawFrequency):0,i=t.filteredFrequency?Math.round(t.filteredFrequency):0,s=t.detectedNote!==null?t.detectedNote:"—",r=t.requiredNote?t.requiredNote.name||t.requiredNote:"—",o=t.semitoneDiff!==null&&t.semitoneDiff!==1/0?Math.abs(t.semitoneDiff).toFixed(2):"∞";this.pitchEl.innerHTML=`
+      ${e} Hz <br>
+      <b>${s}</b> <br>
+      ${i} Hz (filtered) <br>
+      <b>${r}</b> (target) <br>
+      ${o} st (diff)
+    `}}const R=720,B=480,Q=document.getElementById("game"),P=new U(Q,{width:R,height:B}),u=new K,J=new z(f,S),I=new W,q=new _({width:R,height:B}),y=new $(f,{width:R,height:B}),C=new V(J,S);let E=!1,F=0,M=0;async function Z(){try{await I.start(),u.setMicStatus("")}catch(h){u.setMicStatus("Mikrofona giriş alınmadı: "+h.message)}}function O(){u.hideOverlays(),q.reset(),y.reset(),C.reset(),M=0,u.setScore(M),E=!0,F=0,requestAnimationFrame(G)}function j(){E=!1,u.showGameOver(M)}function G(h){if(!E)return;const t=F?h-F:16.7;F=h;const e=I.getReading();q.update(t,e),y.update(t);const i=C.evaluate(q,y);if(i.collided){j();return}i.passedPipe&&(M++,u.setScore(M),y.increaseDifficulty()),u.updateDebug({rawFrequency:e?e.frequency:null,filteredFrequency:q.getFilteredFrequency(),detectedNote:e?e.midiNote:null,requiredNote:y.getCurrentRequiredNote(),semitoneDiff:C.getLastSemitoneDiff()}),P.render({bird:q,pipes:y.list,reading:e,requiredNote:y.getCurrentRequiredNote()}),requestAnimationFrame(G)}document.getElementById("startBtn").addEventListener("click",async()=>{u.setMicStatus("Mikrofon icazəsi gözlənilir..."),await Z(),O()});document.getElementById("retryBtn").addEventListener("click",()=>{O()});P.renderStatic(f);
+</file>
+
+<file path="pitchy-bird/dist/assets/index-BMw2DXHJ.css">
+:root{--parchment: #EFE6D3;--parchment-dark: #E3D6BC;--ink: #3B2A20;--walnut: #5C4030;--walnut-dark: #3E2A1F;--maroon: #7A2333;--gold: #C9A44C;--gold-bright: #E4C878;--line: rgba(59,42,32,.55)}*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%;background:radial-gradient(ellipse at 50% -10%,#FBF6E9 0%,var(--parchment) 55%,var(--parchment-dark) 100%);font-family:EB Garamond,serif;color:var(--ink);overflow:hidden}#app{position:relative;width:100%;max-width:900px;margin:0 auto;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}h1{font-family:Cormorant Garamond,serif;font-weight:600;font-style:italic;font-size:clamp(1.6rem,4vw,2.6rem);letter-spacing:.02em;color:var(--maroon);margin:0 0 2px;text-align:center}.subtitle{font-size:.95rem;color:var(--ink);opacity:.75;margin-bottom:14px;text-align:center;max-width:520px;line-height:1.4}.stage-wrap{position:relative;border-radius:6px;box-shadow:0 18px 40px #3b2a2047,0 0 0 1px #3b2a201f;background:var(--parchment);overflow:hidden}canvas{display:block;background:transparent}.hud{position:absolute;top:14px;left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;pointer-events:none;font-family:Cormorant Garamond,serif}.hud .score{font-size:1.8rem;font-weight:600;color:var(--maroon);text-shadow:0 1px 0 rgba(255,255,255,.6)}.hud .pitch-readout{text-align:right;font-size:1rem;color:var(--ink);background:#efe6d3d9;border:1px solid var(--line);border-radius:6px;padding:4px 10px;line-height:1.3}.pitch-readout b{color:var(--maroon);font-size:1.15rem}.overlay{position:absolute;top:0;right:0;bottom:0;left:0;background:#efe6d3f0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;gap:14px}.overlay h2{font-family:Cormorant Garamond,serif;font-style:italic;font-weight:600;color:var(--maroon);font-size:clamp(1.4rem,3.2vw,2rem);margin:0}.overlay p{max-width:480px;line-height:1.55;margin:0;font-size:.98rem}.note-legend{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:480px}.note-chip{font-size:.8rem;padding:3px 9px;border:1px solid var(--line);border-radius:999px;background:var(--parchment-dark)}button.primary{font-family:Cormorant Garamond,serif;font-style:italic;font-weight:600;font-size:1.15rem;color:var(--parchment);background:linear-gradient(180deg,var(--maroon),#5c1725);border:none;border-radius:999px;padding:12px 34px;cursor:pointer;box-shadow:0 6px 16px #7a233359;transition:transform .15s ease,box-shadow .15s ease}button.primary:hover{transform:translateY(-1px);box-shadow:0 9px 20px #7a23336b}button.primary:active{transform:translateY(0)}.mic-status{font-size:.85rem;color:var(--ink);opacity:.7}.final-score{font-family:Cormorant Garamond,serif;font-size:2.6rem;font-weight:600;color:var(--maroon)}footer{margin-top:10px;font-size:.78rem;opacity:.55;text-align:center}
+</file>
+
+<file path="pitchy-bird/dist/index.html">
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skripka Flappy — Nota ilə Uç</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-BqqKQ1aD.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BMw2DXHJ.css">
+</head>
+<body>
+<div id="app">
+  <h1>Skripka Flappy</h1>
+  <div class="subtitle">Səsinin tezliyi ilə quşu idarə et. Hər boru cütü müəyyən bir nota tələb edir — o notanı çal (və ya oxu), quş həndətmiş hündürlüyə qalxsın.</div>
+
+  <div class="stage-wrap">
+    <canvas id="game" width="720" height="480"></canvas>
+
+    <div class="hud">
+      <div class="score" id="scoreEl">0</div>
+      <div class="pitch-readout" id="pitchEl">— <br><b>—</b></div>
+    </div>
+
+    <div class="overlay" id="startOverlay">
+      <h2>Başlamazdan əvvəl</h2>
+      <p>Mikrofon icazəsi lazımdır. Skripkanı yaxınlaşdır və ya səslə oxu — proqram avtomatik tezliyi (Hz) tutub notaya çevirəcək.</p>
+      <div class="note-legend" id="legend"></div>
+      <button class="primary" id="startBtn">Mikrofonu aç və başla</button>
+      <div class="mic-status" id="micStatus"></div>
+    </div>
+
+    <div class="overlay" id="overOverlay" style="display:none;">
+      <h2>Oyun bitdi</h2>
+      <div class="final-score" id="finalScore">0</div>
+      <p id="overNote"></p>
+      <button class="primary" id="retryBtn">Yenidən cəhd et</button>
+    </div>
+  </div>
+  <footer>Diapazon: G3 (196 Hz) — E5 (659 Hz), skripkanın açıq simləri arasındakı zona</footer>
+</div>
+
+</body>
+</html>
+</file>
+
+<file path="pitchy-bird/src/audio/constants.js">
+/* NOTES configuration - G3 (196Hz) to E5 (659Hz) */
+export const NOTES = [
+  {name:'G3', freq:196.00},
+  {name:'A3', freq:220.00},
+  {name:'B3', freq:246.94},
+  {name:'C4', freq:261.63},
+  {name:'D4', freq:293.66},
+  {name:'E4', freq:329.63},
+  {name:'F#4', freq:369.99},
+  {name:'G4', freq:392.00},
+  {name:'A4', freq:440.00},
+  {name:'B4', freq:493.88},
+  {name:'C5', freq:523.25},
+  {name:'D5', freq:587.33},
+  {name:'E5', freq:659.25}
+];
+
+/* Frequency bounds for pitch mapping */
+export const MIN_FREQ = NOTES[0].freq * 0.94;
+export const MAX_FREQ = NOTES[NOTES.length - 1].freq * 1.06;
+
+/* Configuration parameters - EXPORTED for easy tuning */
+export const TOLERANCE_SEMITONES = 0.5;
+  // 0.5 = ~half semitone tolerance
+  // ~0.33 = ~1/3 semitone (very strict)
+  // ~1.0 = ~1 full semitone (very loose)
+export const SIGNAL_LOSS_FRAMES = 5;
+export const OCTAVE_RATIO_MIN = 0.45;
+export const OCTAVE_RATIO_MAX = 2.2;
+export const SMOOTHING_FACTOR = 0.12;
+
+/* Helper: frequency to MIDI note number */
+export function freqToMidi(freq) {
+  if (!freq || freq <= 0) return null;
+  return 69 + 12 * Math.log2(freq / 440);
+}
+
+/* Helper: MIDI note to frequency */
+export function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+/* Helper: frequency to Y coordinate on canvas */
+export function freqToY(freq, playTop, playBottom) {
+  const f = Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq));
+  const t = (Math.log2(f) - Math.log2(MIN_FREQ)) / (Math.log2(MAX_FREQ) - Math.log2(MIN_FREQ));
+  return playBottom - t * (playBottom - playTop);
+}
+
+/* Helper: note name from MIDI number */
+export function midiToNoteName(midi) {
+  if (midi === null || midi === undefined) return '—';
+  const rounded = Math.round(midi);
+  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const name = names[(rounded % 12 + 12) % 12];
+  const octave = Math.floor(rounded / 12) - 1;
+  return name + octave;
+}
+</file>
+
+<file path="pitchy-bird/src/audio/NoteMatcher.js">
+import { NOTES, TOLERANCE_SEMITONES, freqToMidi, midiToFreq } from './constants.js';
+
+export class NoteMatcher {
+  constructor(notes, tolerance = TOLERANCE_SEMITONES) {
+    this.notes = notes || NOTES;
+    this.tolerance = tolerance;
+  }
+
+  /* Convert frequency to nearest MIDI note number */
+  freqToMidi(freq) {
+    if (!freq || freq <= 0) return null;
+    return 69 + 12 * Math.log2(freq / 440);
+  }
+
+  /* Get required note for a pipe */
+  getRequiredNote(pipe) {
+    return pipe.note;
+  }
+
+  /* Calculate semitone difference between two frequencies */
+  getSemitoneDiff(freq1, freq2) {
+    if (!freq1 || !freq2) return Infinity;
+    const midi1 = this.freqToMidi(freq1);
+    const midi2 = this.freqToMidi(freq2);
+    return Math.abs(midi1 - midi2);
+  }
+
+  /* Check if a pitch reading is within tolerance of the target note */
+  isWithinTolerance(readingMidi, targetMidi) {
+    if (readingMidi === null || targetMidi === null) return false;
+    const diff = Math.abs(readingMidi - targetMidi);
+    return diff <= this.tolerance;
+  }
+
+  /* Get the nearest note for a frequency */
+  getNearestNote(freq) {
+    if (!freq || freq <= 0) return null;
+    const midi = this.freqToMidi(freq);
+    return this.notes.find(n => Math.abs(this.freqToMidi(n.freq) - midi) < 0.5) || this.notes[0];
+  }
+
+  /* Evaluate if a reading passes the tolerance check */
+  evaluate(reading, targetNote) {
+    if (!reading || !targetNote) {
+      return { pass: false, diff: Infinity, within: false };
+    }
+
+    const targetMidi = this.freqToMidi(targetNote.freq);
+    const readingMidi = this.freqToMidi(reading.frequency);
+
+    const diff = Math.abs(readingMidi - targetMidi);
+    const within = diff <= this.tolerance;
+
+    return {
+      pass: within,
+      diff: diff,
+      within: within,
+      readingMidi: readingMidi,
+      targetMidi: targetMidi
+    };
+  }
+
+  /* Get MIDI note number for a given frequency */
+  freqToMidiNumber(freq) {
+    return freqToMidi(freq);
+  }
+
+  /* Get frequency for a MIDI note number */
+  midiToFrequency(midi) {
+    return midiToFreq(midi);
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/audio/PitchDetector.js">
+import { NOTES } from '../audio/constants.js';
+
+export class PitchDetector {
+  constructor() {
+    this.audioContext = null;
+    this.analyser = null;
+    this.source = null;
+    this.stream = null;
+    this.buffers = [];
+    this.maxBuffers = 4;
+    this.minConfidence = 10;
+
+    this.currentFreq = 0;
+    this.lastValidFreq = 0;
+    this.confidence = 0;
+    this.hysteresis = 0;
+    this.silentFrames = 0;
+    this.lastStrongFreq = 0;
+
+    this.smoothingFactor = 0.4;
+
+    this.octaveRatioMin = 0.45;
+    this.octaveRatioMax = 2.2;
+    this.invOctaveRatioMax = 1 / this.octaveRatioMin;
+
+    this.minFrequency = 196;
+    this.maxFrequency = 659;
+
+    // Energy/volume thresholds for voice detection
+    this.minRMSThreshold = 0.005;       // Minimum RMS energy to consider signal (was 0.01, lowered for sensitivity)
+    this.minConfidence = 10;             // Minimum autocorrelation confidence
+    this.minEnergyRatio = 0.15;          // Minimum energy ratio (signal vs noise floor)
+
+    this.isActive = false;
+
+    // DEBUG: müvəqqəti frame sayğacı (diaqnostika üçün)
+    this._debugFrame = 0;
+  }
+
+  async start() {
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      return;
+    }
+
+    if (!window.AudioContext && !window.webkitAudioContext) {
+      throw new Error(' AudioContext not supported in this browser');
+    }
+
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      // DEBUG (a): getUserMedia uğurlu oldu
+      console.log('[PitchDetector] getUserMedia OK — sampleRate:', this.audioContext.sampleRate, 'tracks:', this.stream.getAudioTracks().map(t => t.label));
+      this.source = this.audioContext.createMediaStreamSource(this.stream);
+      this.analyser = this.audioContext.createAnalyser();
+
+      this.analyser.fftSize = 2048;
+      this.analyser.smoothingTimeConstant = 0;  // Disable smoothing for time-domain analysis
+      this.analyser.minDecibels = -100;
+      this.analyser.maxDecibels = -30;
+
+      this.source.connect(this.analyser);
+
+      // Time-domain buffer — fftSize ölçüsünde olmalıdır,
+      // çünki getFloatTimeDomainData() fftSize elementlə doldurur.
+      this.dataBuffer = new Float32Array(this.analyser.fftSize);
+
+      this.buffers = [];
+      this.currentFreq = 0;
+      this.lastValidFreq = 0;
+      this.confidence = 0;
+      this.hysteresis = 0;
+      this.silentFrames = 0;
+      this.lastStrongFreq = 0;
+
+      this.isActive = true;
+
+      this.autoCorrelate();
+      return this.isActive;
+    } catch (error) {
+      console.error(' Failed to initialize microphone:', error);
+      this.isActive = false;
+      throw error;
+    }
+  }
+
+  autoCorrelate() {
+    if (!this.isActive || !this.analyser) return;
+
+    requestAnimationFrame(() => {
+      const data = this.dataBuffer;
+      this.analyser.getFloatTimeDomainData(data);
+
+      // DEBUG: every frame log first few values and check for non-zero
+      const hasNonZero = data.some(v => v !== 0);
+      const sumAbs = data.reduce((acc, v) => acc + Math.abs(v), 0);
+      const avgAbs = sumAbs / data.length;
+      this._debugFrame++;
+      if (this._debugFrame % 30 === 0) {
+        console.log('[PitchDetector] frame', this._debugFrame,
+          '| bufferLength:', data.length,
+          '| hasNonZero:', hasNonZero,
+          '| avg|v|:', avgAbs.toFixed(6),
+          '| first5:', data.slice(0,5).map(v=>v.toFixed(3)));
+      }
+
+      const result = this.correlate(data, this.audioContext.sampleRate);
+      this.processFrequencyData(result);
+
+      // Schedule next autocorrelation step
+      this.autoCorrelate();
+    });
+  }
+
+  /*
+   * Robust auto-correlation pitch detection algorithm with improvements:
+   * 1. RMS normalization for consistent amplitude handling
+   * 2. Spectral trimming to remove silent outliers
+   * 3. Correlation for known glottal closure periods using autocorrelation
+   * 4. Parabolic interpolation for sub-sample frequency accuracy
+   * 5. Confidence calculation based on signal-to-noise ratio
+   */
+  correlate(buf, sampleRate) {
+    const SIZE = buf.length;
+
+    // Step 1: Compute RMS with proper normalization
+    let rmsSquared = 0;
+    for (let i = 0; i < SIZE; i++) rmsSquared += buf[i] * buf[i];
+    const rms = Math.sqrt(rmsSquared / SIZE);
+
+    // Early exit if signal is too quiet
+    if (rms < this.minRMSThreshold) {
+      return { frequency: 0, confidence: 0 };
+    }
+
+    // Step 2: Normalize the buffer to unit RMS for correlation
+    const normalizedBuf = new Float32Array(SIZE);
+    for (let i = 0; i < SIZE; i++) {
+      normalizedBuf[i] = buf[i] / rms;
+    }
+
+    // Step 3: Trim silent regions at start and end
+    const thres = 0.2;
+    let start = 0, end = SIZE - 1;
+
+    // Find start of active signal
+    for (start = 0; start < SIZE / 2; start++) {
+      if (Math.abs(normalizedBuf[start]) >= thres) break;
+    }
+
+    // Find end of active signal
+    for (end = SIZE - 1; end > SIZE / 2; end--) {
+      if (Math.abs(normalizedBuf[end]) >= thres) break;
+    }
+
+    // Ensure minimum buffer length
+    const minBufferLen = 8;
+    if (end - start < minBufferLen) {
+      return { frequency: 0, confidence: 0 };
+    }
+
+    const trimmed = normalizedBuf.slice(start, end + 1);
+    const n = trimmed.length;
+
+    // Step 4: Compute normalized auto-correlation
+    const correlation = new Float32Array(n);
+    let cMax = 0;
+
+    for (let lag = 0; lag < n; lag++) {
+      let sum = 0;
+      // Optimized correlation calculation
+      for (let i = 0; i < n - lag; i++) {
+        sum += trimmed[i] * trimmed[i + lag];
+      }
+      // Normalize correlation
+      correlation[lag] = sum / (n - lag);
+
+      // Track maximum correlation
+      if (correlation[lag] > cMax) cMax = correlation[lag];
+    }
+
+    // If max correlation is negligible, signal is too noisy
+    if (cMax < 0.1) {
+      return { frequency: 0, confidence: 0 };
+    }
+
+    // Step 5: Skip initial decline (classic YIN principle)
+    let d = 0;
+    while (d < n - 1 && correlation[d] > correlation[d + 1]) d++;
+
+    // Find first peak after the initial decline
+    let peakIndex = -1;
+    let peakValue = -1;
+    for (let i = d; i < n - 1; i++) {
+      if (correlation[i] > peakValue) {
+        peakValue = correlation[i];
+        peakIndex = i;
+        // Stop at first local maximum (first peak = fundamental period)
+        if (i + 1 < n && correlation[i] > correlation[i + 1]) {
+          break;
+        }
+      }
+    }
+
+    if (peakIndex <= 0) {
+      return { frequency: 0, confidence: 0 };
+    }
+
+    // Step 6: Parabolic interpolation for sub-sample precision
+    let preciseIndex = peakIndex;
+    if (peakIndex > 0 && peakIndex < n - 1) {
+      const x1 = correlation[peakIndex - 1];
+      const x2 = correlation[peakIndex];
+      const x3 = correlation[peakIndex + 1];
+
+      // Parabolic coefficients
+      const a = (x1 + x3 - 2 * x2) / 2;
+      const b = (x3 - x1) / 2;
+
+      // Calculate vertex of parabola for fractional index
+      if (Math.abs(a) > 1e-10) {
+        preciseIndex = peakIndex - b / (2 * a);
+      }
+    }
+
+    // Step 7: Calculate frequency from precise index
+    // Convert lag to period, then to frequency
+    const precisePeriod = preciseIndex / sampleRate;
+    const freq = 1.0 / precisePeriod;
+
+    // Validate frequency range (adjustable based on application)
+    const minFreq = 50;
+    const maxFreq = 2000;
+    if (freq < minFreq || freq > maxFreq) {
+      return { frequency: 0, confidence: 0 };
+    }
+
+    // Step 8: Calculate confidence as normalized correlation strength
+    // Normalize by maximum possible correlation (signal energy at lag 0)
+    const maxPossibleCorrelation = 1.0; // Since we're normalized
+    const confidence = Math.max(0, Math.min(100, (peakValue / maxPossibleCorrelation) * 100));
+
+    return { frequency: freq, confidence: confidence };
+  }
+
+  processFrequencyData(result) {
+    const { frequency, confidence } = result;
+
+    if (!frequency || frequency < this.minFrequency || frequency > this.maxFrequency) {
+      this.silentFrames++;
+      if (this.silentFrames >= 3) {
+        this.hysteresis = 0;
+        this.currentFreq = 0;
+      }
+      return;
+    }
+
+    this.silentFrames = 0;
+
+    const ratio = frequency / (this.lastStrongFreq || 1);
+    const invRatio = 1 / ratio;
+
+    const isOctaveJump = this.lastStrongFreq > 0 && (
+      ratio > this.octaveRatioMax ||
+      ratio < this.octaveRatioMin ||
+      invRatio > this.invOctaveRatioMax
+    );
+
+    if (confidence > this.minConfidence && !isOctaveJump) {
+      this.hysteresis = Math.max(0, this.hysteresis - 1);
+
+      if (this.hysteresis === 0) {
+        this.lastStrongFreq = frequency;
+        this.currentFreq = this.currentFreq ? this.smoothingFactor * frequency + (1 - this.smoothingFactor) * this.currentFreq : frequency;
+        this.confidence = confidence;
+        this.lastValidFreq = frequency;
+      }
+    } else {
+      this.hysteresis = Math.min(5, this.hysteresis + 1);
+    }
+  }
+
+  getReading() {
+    const freq = this.currentFreq || this.lastValidFreq || 0;
+
+    return {
+      frequency: freq,
+      midiNote: freq ? Math.round(freqToMidi(freq)) : null,
+      confidence: this.confidence,
+      timestamp: Date.now()
+    };
+  }
+
+  stop() {
+    this.isActive = false;
+
+    if (this.source) {
+      this.source.disconnect();
+    }
+    if (this.analyser) {
+      this.analyser.disconnect();
+    }
+
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+    }
+
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+    }
+  }
+}
+
+function freqToMidi(freq) {
+  return 69 + 12 * Math.log2(freq / 440);
+}
+</file>
+
+<file path="pitchy-bird/src/game/Bird.js">
+import { MIN_FREQ, MAX_FREQ, freqToY, NOTES } from '../audio/constants.js';
+
+export class Bird {
+  constructor(options = {}) {
+    this.width = options.width || 720;
+    this.height = options.height || 480;
+
+    this.playTop = 24;
+    this.playBottom = this.height - 24;
+    this.birdRadius = 14;
+    this.birdX = 150;
+
+    this.y = this.height / 2;
+    this.targetY = this.height / 2;
+    this.velocity = 0;
+
+    this.smoothingFactor = 0.12;
+    this.gravity = 0.018;      // sükut zamanı düşmə sürəti (0.015-0.02 aralığı)
+    this.maxFallSpeed = 2.5;   // maksimal düşmə sürəti (2-3 aralığı)
+
+    this.filteredFreq = 0;
+    this.freqHistory = [];
+    this.maxHistory = 5;
+
+    this.lastReading = null;
+  }
+
+  reset() {
+    this.y = this.height / 2;
+    this.targetY = this.height / 2;
+    this.velocity = 0;
+    this.filteredFreq = 0;
+    this.freqHistory = [];
+    this.lastReading = null;
+  }
+
+  update(deltaMs, reading) {
+    const dt = deltaMs / 1000;
+
+    this.lastReading = reading;
+
+    if (reading && reading.frequency > 0) {
+      this.filteredFreq = reading.frequency;
+      this.freqHistory.push(reading.frequency);
+      if (this.freqHistory.length > this.maxHistory) {
+        this.freqHistory.shift();
+      }
+
+      const medianFreq = this.getMedian(this.freqHistory);
+      const targetFreq = medianFreq || this.filteredFreq;
+
+      const targetY = freqToY(targetFreq, this.playTop, this.playBottom);
+      this.targetY = Math.max(this.playTop + this.birdRadius, Math.min(this.playBottom - this.birdRadius, targetY));
+    } else {
+      this.velocity += this.gravity * dt * 60;
+      this.velocity = Math.min(this.velocity, this.maxFallSpeed);
+    }
+
+    this.y += (this.targetY - this.y) * this.smoothingFactor + this.velocity * dt * 60;
+    this.y = Math.max(this.playTop + this.birdRadius, Math.min(this.playBottom - this.birdRadius, this.y));
+  }
+
+  getMedian(arr) {
+    if (!arr.length) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  getY() {
+    return this.y;
+  }
+
+  getTargetY() {
+    return this.targetY;
+  }
+
+  getX() {
+    return this.birdX;
+  }
+
+  getRadius() {
+    return this.birdRadius;
+  }
+
+  getFilteredFrequency() {
+    return this.filteredFreq;
+  }
+
+  isAlive() {
+    return this.y >= this.playTop + this.birdRadius && this.y <= this.playBottom - this.birdRadius;
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/game/CollisionSystem.js">
+import { TOLERANCE_SEMITONES } from '../audio/constants.js';
+
+export class CollisionSystem {
+  constructor(noteMatcher, tolerance = TOLERANCE_SEMITONES) {
+    this.noteMatcher = noteMatcher;
+    this.tolerance = tolerance;
+    this.lastSemitoneDiff = Infinity;
+    this.lastPass = false;
+    this.readingHistory = []; // { timestamp, frequency } — sliding window
+    this.windowMs = 280;      // 200-300ms pəncərə (median hesabı üçün)
+  }
+
+  reset() {
+    this.lastSemitoneDiff = Infinity;
+    this.lastPass = false;
+    this.readingHistory = [];
+  }
+
+  /* Hər frame son tutulan reading-i pəncərəyə yaz, köhnələri sil */
+  recordReading(reading, now) {
+    if (reading && reading.frequency > 0) {
+      this.readingHistory.push({
+        timestamp: reading.timestamp || now,
+        frequency: reading.frequency
+      });
+    }
+    const cutoff = now - this.windowMs;
+    while (this.readingHistory.length && this.readingHistory[0].timestamp < cutoff) {
+      this.readingHistory.shift();
+    }
+  }
+
+  /* Pəncərədəki reading-lərin target nota qarşı median semitone fərqi */
+  medianSemitoneDiff(targetFreq) {
+    const diffs = this.readingHistory
+      .filter(r => r.frequency > 0)
+      .map(r => this.noteMatcher.getSemitoneDiff(r.frequency, targetFreq));
+    if (!diffs.length) return Infinity;
+    const sorted = [...diffs].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  evaluate(bird, pipe) {
+    const now = Date.now();
+    const reading = bird.lastReading;
+
+    // Pəncərəni cari reading ilə yenilə (median üçün lazımdır)
+    this.recordReading(reading, now);
+
+    const birdY = bird.getY();
+    const birdRadius = bird.getRadius();
+
+    let collided = false;
+    let passedPipe = false;
+
+    for (const p of pipe.list) {
+      const withinX = bird.birdX + birdRadius > p.x &&
+                      bird.birdX - birdRadius < p.x + pipe.pipeWidth;
+
+      if (withinX) {
+        const gapTop = pipe.getGapTop(p);
+        const gapBottom = pipe.getGapBottom(p);
+        if (birdY - birdRadius < gapTop || birdY + birdRadius > gapBottom) {
+          collided = true;
+          break;
+        }
+      }
+
+      // Pipe keçildiyi an: median semitone fərqinə görə qərar ver
+      if (!p.passed && p.x + pipe.pipeWidth < bird.birdX - birdRadius) {
+        p.passed = true;
+
+        const medianDiff = this.medianSemitoneDiff(p.note.freq);
+        this.lastSemitoneDiff = medianDiff;
+        this.lastPass = medianDiff <= this.tolerance;
+
+        if (this.lastPass) {
+          passedPipe = true;
+        } else {
+          collided = true;
+        }
+      }
+    }
+
+    return {
+      collided,
+      passedPipe,
+      semitoneDiff: this.lastSemitoneDiff,
+      passed: this.lastPass
+    };
+  }
+
+  getLastSemitoneDiff() {
+    return this.lastSemitoneDiff;
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/game/GameLoop.js">
+export class GameLoop {
+  constructor(callback) {
+    this.callback = callback;
+    this.running = false;
+    this.lastTimestamp = 0;
+    this.animationFrameId = null;
+  }
+
+  start() {
+    if (this.running) return;
+
+    this.running = true;
+    this.lastTimestamp = 0;
+    this.loop = (timestamp) => {
+      if (!this.running) return;
+
+      const deltaMs = this.lastTimestamp ? timestamp - this.lastTimestamp : 16.7;
+      this.lastTimestamp = timestamp;
+
+      this.callback(deltaMs);
+
+      this.animationFrameId = requestAnimationFrame(this.loop);
+    };
+
+    this.animationFrameId = requestAnimationFrame(this.loop);
+  }
+
+  stop() {
+    this.running = false;
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  reset() {
+    this.lastTimestamp = 0;
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/game/Pipe.js">
+import { freqToY, NOTES } from '../audio/constants.js';
+
+export class Pipe {
+  constructor(notes, options = {}) {
+    this.notes = notes || NOTES;
+    this.width = options.width || 720;
+    this.height = options.height || 480;
+
+    this.playTop = 24;
+    this.playBottom = this.height - 24;
+
+    this.pipeWidth = 46;
+    this.pipeGap = 140;
+    this.pipeSpeed = 2.6;
+    this.spawnX = this.width + 40;
+
+    this.list = [];
+    this.passedNote = null;
+    this.difficulty = 0;
+  }
+
+  reset() {
+    this.list = [];
+    this.pipeSpeed = 2.6;
+    this.difficulty = 0;
+    this.spawnPipe();
+  }
+
+  spawnPipe() {
+    const note = this.notes[Math.floor(Math.random() * this.notes.length)];
+    const gapCenterY = freqToY(note.freq, this.playTop, this.playBottom);
+
+    this.list.push({
+      x: this.spawnX,
+      note: note,
+      gapCenterY: gapCenterY,
+      passed: false
+    });
+  }
+
+  update(deltaMs) {
+    const speed = this.pipeSpeed + this.difficulty * 0.1;
+
+    this.list.forEach(p => {
+      p.x -= speed;
+    });
+
+    if (this.list.length && this.list[this.list.length - 1].x < this.width - 280) {
+      this.spawnPipe();
+    }
+
+    this.list = this.list.filter(p => p.x > -this.pipeWidth - 20);
+  }
+
+  increaseDifficulty() {
+    this.difficulty = Math.min(5, this.difficulty + 1);
+    this.pipeSpeed = Math.min(5.2, this.pipeSpeed + 0.06);
+  }
+
+  getGapTop(pipe) {
+    return pipe.gapCenterY - this.pipeGap / 2;
+  }
+
+  getGapBottom(pipe) {
+    return pipe.gapCenterY + this.pipeGap / 2;
+  }
+
+  getCurrentRequiredNote() {
+    for (const p of this.list) {
+      if (p.x > 0 && p.x < this.spawnX) {
+        return p.note;
+      }
+    }
+    return null;
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/render/Renderer.js">
+import { NOTES, MIN_FREQ, MAX_FREQ, freqToY } from '../audio/constants.js';
+
+export class Renderer {
+  constructor(canvas, options = {}) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.width = options.width || canvas.width;
+    this.height = options.height || canvas.height;
+
+    this.noteMarginL = 46;
+    this.playTop = 24;
+    this.playBottom = this.height - 24;
+    this.pipeGap = 140;
+    this.pipeWidth = 46;
+    this.birdRadius = 14;
+    this.birdX = 150;
+  }
+
+  /* Statik staff çəkimi (başlangıç üçün) */
+  renderStatic(notes) {
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    this.drawStaff(notes);
+  }
+
+  /* Tam render funksiyası */
+  render({ bird, pipes, reading, requiredNote }) {
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    this.drawStaff(NOTES);
+    this.drawPipes(pipes, requiredNote);
+    this.drawBird(bird, reading);
+  }
+
+  drawStaff(notes) {
+    this.ctx.save();
+    this.ctx.strokeStyle = 'rgba(59,42,32,0.28)';
+    this.ctx.lineWidth = 1;
+    this.ctx.font = "13px 'EB Garamond', serif";
+    this.ctx.fillStyle = 'rgba(59,42,32,0.65)';
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'middle';
+
+    notes.forEach(n => {
+      const y = freqToY(n.freq, this.playTop, this.playBottom);
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.noteMarginL, y);
+      this.ctx.lineTo(this.width - 10, y);
+      this.ctx.stroke();
+      this.ctx.fillText(n.name, 8, y);
+    });
+    this.ctx.restore();
+  }
+
+  drawPipes(pipes, requiredNote) {
+    pipes.forEach(p => this.drawPipe(p));
+  }
+
+  drawPipe(p) {
+    const gapTop = p.gapCenterY - this.pipeGap / 2;
+    const gapBottom = p.gapCenterY + this.pipeGap / 2;
+
+    this.ctx.save();
+    const grad = this.ctx.createLinearGradient(p.x, 0, p.x + this.pipeWidth, 0);
+    grad.addColorStop(0, '#6b4a36');
+    grad.addColorStop(0.5, '#5C4030');
+    grad.addColorStop(1, '#4a3226');
+    this.ctx.fillStyle = grad;
+
+    // top pillar
+    this.ctx.fillRect(p.x, this.playTop - 10, this.pipeWidth, Math.max(0, gapTop - (this.playTop - 10)));
+    // bottom pillar
+    this.ctx.fillRect(p.x, gapBottom, this.pipeWidth, Math.max(0, (this.playBottom + 10) - gapBottom));
+
+    // scroll caps — kəpənəq körləkləri
+    this.ctx.fillStyle = '#3E2A1F';
+    this.ctx.fillRect(p.x - 3, gapTop - 14, this.pipeWidth + 6, 14);
+    this.ctx.fillRect(p.x - 3, gapBottom, this.pipeWidth + 6, 14);
+
+    // not siyahısı
+    this.ctx.fillStyle = '#7A2333';
+    this.ctx.font = "bold 15px 'Cormorant Garamond', serif";
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(p.note.name, p.x + this.pipeWidth / 2, p.gapCenterY);
+    this.ctx.restore();
+  }
+
+  drawBird(bird, reading) {
+    const hasSignal = reading && reading.frequency > 0;
+    this.ctx.save();
+    this.ctx.translate(bird.birdX, bird.y);
+    this.ctx.fillStyle = hasSignal ? '#C9A44C' : '#9c8256';
+    this.ctx.strokeStyle = '#3E2A1F';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 8, 9, 6.5, -0.35, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.moveTo(7, 4);
+    this.ctx.lineTo(7, -24);
+    this.ctx.lineTo(10, -24);
+    this.ctx.quadraticCurveTo(16, -16, 9, -8);
+    this.ctx.lineTo(9, 4);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/ui/HUD.js">
+export class HUD {
+  constructor() {
+    this.scoreEl = document.getElementById('scoreEl');
+    this.pitchEl = document.getElementById('pitchEl');
+    this.startOverlay = document.getElementById('startOverlay');
+    this.overOverlay = document.getElementById('overOverlay');
+    this.finalScore = document.getElementById('finalScore');
+    this.overNote = document.getElementById('overNote');
+    this.micStatus = document.getElementById('micStatus');
+    this.legend = document.getElementById('legend');
+    this.startBtn = document.getElementById('startBtn');
+    this.retryBtn = document.getElementById('retryBtn');
+
+    // Əvvəlki vəziyyətləri yadda saxlamaq
+    this.currentScore = 0;
+  }
+
+  setScore(score) {
+    this.scoreEl.textContent = score;
+  }
+
+  setMicStatus(message) {
+    this.micStatus.textContent = message;
+  }
+
+  hideOverlays() {
+    this.startOverlay.style.display = 'none';
+    this.overOverlay.style.display = 'none';
+  }
+
+  showGameOver(score) {
+    this.overOverlay.style.display = 'flex';
+    this.finalScore.textContent = score;
+    this.overNote.textContent =
+      score === 0
+        ? 'Boruların arasından keçmək üçün lazımi notanı dəqiq tut.'
+        : 'Yaxşı nəticə! Diapazonu genişləndirmək üçün yenidən cəhd et.';
+  }
+
+  updateDebug(data) {
+    if (!this.pitchEl) return;
+
+    const rawFreq = data.rawFrequency ? Math.round(data.rawFrequency) : 0;
+    const filteredFreq = data.filteredFrequency ? Math.round(data.filteredFrequency) : 0;
+    const detectedNote = data.detectedNote !== null ? data.detectedNote : '—';
+    const requiredNoteName = data.requiredNote ? data.requiredNote.name || data.requiredNote : '—';
+    const semitoneDiff = data.semitoneDiff !== null && data.semitoneDiff !== Infinity ? Math.abs(data.semitoneDiff).toFixed(2) : '∞';
+
+    this.pitchEl.innerHTML = `
+      ${rawFreq} Hz <br>
+      <b>${detectedNote}</b> <br>
+      ${filteredFreq} Hz (filtered) <br>
+      <b>${requiredNoteName}</b> (target) <br>
+      ${semitoneDiff} st (diff)
+    `;
+  }
+}
+</file>
+
+<file path="pitchy-bird/src/main.js">
+import '../style.css';
+
+import { NOTES, TOLERANCE_SEMITONES } from './audio/constants.js';
+import { PitchDetector } from './audio/PitchDetector.js';
+import { NoteMatcher } from './audio/NoteMatcher.js';
+import { Bird } from './game/Bird.js';
+import { Pipe } from './game/Pipe.js';
+import { CollisionSystem } from './game/CollisionSystem.js';
+import { Renderer } from './render/Renderer.js';
+import { HUD } from './ui/HUD.js';
+
+/* ------------------------------------------------------------------ *
+ *  Pitchy Bird — giriş nöqtəsi (entry point)
+ *  Bütün modulları burada qoşuruq və əsas oyun döngüsünü idarə edirik.
+ * ------------------------------------------------------------------ */
+
+const W = 720;
+const H = 480;
+
+const canvas = document.getElementById('game');
+const renderer = new Renderer(canvas, { width: W, height: H });
+const hud = new HUD();
+
+const noteMatcher = new NoteMatcher(NOTES, TOLERANCE_SEMITONES);
+const pitchDetector = new PitchDetector();
+const bird = new Bird({ width: W, height: H });
+const pipe = new Pipe(NOTES, { width: W, height: H });
+const collision = new CollisionSystem(noteMatcher, TOLERANCE_SEMITONES);
+
+let running = false;
+let lastTimestamp = 0;
+let score = 0;
+
+/* Mikrofonu başlat */
+async function initAudio() {
+  try {
+    await pitchDetector.start();
+    hud.setMicStatus('');
+  } catch (err) {
+    hud.setMicStatus('Mikrofona giriş alınmadı: ' + err.message);
+  }
+}
+
+/* Oyunu sıfırla və başlat */
+function startGame() {
+  hud.hideOverlays();
+  bird.reset();
+  pipe.reset();
+  collision.reset();
+  score = 0;
+  hud.setScore(score);
+  running = true;
+  lastTimestamp = 0;
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  running = false;
+  hud.showGameOver(score);
+}
+
+/* Əsas döngü — delta-time əsaslı */
+function gameLoop(timestamp) {
+  if (!running) return;
+
+  const deltaMs = lastTimestamp ? timestamp - lastTimestamp : 16.7;
+  lastTimestamp = timestamp;
+
+  const reading = pitchDetector.getReading() || {};
+  reading.frequency = reading.frequency || 0;
+  bird.update(deltaMs, reading);
+  pipe.update(deltaMs);
+
+  /* CollisionSystem-i faktiki olaraq çağırırıq:
+     quşun son tutulan notası ilə borunun tələb etdiyi notası
+     arasındakı semitone fərqini tolerantlıq həddi ilə müqayisə edir. */
+  const result = collision.evaluate(bird, pipe);
+
+  if (result.collided) {
+    endGame();
+    return;
+  }
+  if (result.passedPipe) {
+    score++;
+    hud.setScore(score);
+    pipe.increaseDifficulty();
+  }
+
+  /* Debug overlay üçün məlumatları HUD-a ötürürük */
+  hud.updateDebug({
+    rawFrequency: reading ? reading.frequency : null,
+    filteredFrequency: bird.getFilteredFrequency(),
+    detectedNote: reading ? reading.midiNote : null,
+    requiredNote: pipe.getCurrentRequiredNote(),
+    semitoneDiff: collision.getLastSemitoneDiff()
+  });
+
+  renderer.render({
+    bird,
+    pipes: pipe.list,
+    reading,
+    requiredNote: pipe.getCurrentRequiredNote()
+  });
+
+  requestAnimationFrame(gameLoop);
+}
+
+/* UI hadisələri */
+document.getElementById('startBtn').addEventListener('click', async () => {
+  hud.setMicStatus('Mikrofon icazəsi gözlənilir...');
+  await initAudio();
+  startGame();
+});
+
+document.getElementById('retryBtn').addEventListener('click', () => {
+  startGame();
+});
+
+/* İlk statik çəkiliş */
+renderer.renderStatic(NOTES);
+</file>
+
+<file path="pitchy-bird/.gitignore">
+*.csv
+# VS Code və konfiqurasiya tənzimləmələri
+.vscode/
+.claude/
+*.config.json
+.env
+
+# Yaddaş və müvəqqəti fayllar
+.claude-code-router/
+</file>
+
+<file path="pitchy-bird/bird.html">
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skripka Flappy — Nota ilə Uç</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --parchment: #EFE6D3;
+    --parchment-dark: #E3D6BC;
+    --ink: #3B2A20;
+    --walnut: #5C4030;
+    --walnut-dark: #3E2A1F;
+    --maroon: #7A2333;
+    --gold: #C9A44C;
+    --gold-bright: #E4C878;
+    --line: rgba(59,42,32,0.55);
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: radial-gradient(ellipse at 50% -10%, #FBF6E9 0%, var(--parchment) 55%, var(--parchment-dark) 100%);
+    font-family: 'EB Garamond', serif;
+    color: var(--ink);
+    overflow: hidden;
+  }
+  #app{
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    height: 100vh;
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+    justify-content:center;
+  }
+  h1{
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+    font-style: italic;
+    font-size: clamp(1.6rem, 4vw, 2.6rem);
+    letter-spacing: 0.02em;
+    color: var(--maroon);
+    margin: 0 0 2px 0;
+    text-align:center;
+  }
+  .subtitle{
+    font-size: 0.95rem;
+    color: var(--ink);
+    opacity: 0.75;
+    margin-bottom: 14px;
+    text-align:center;
+    max-width: 520px;
+    line-height:1.4;
+  }
+  .stage-wrap{
+    position: relative;
+    border-radius: 6px;
+    box-shadow: 0 18px 40px rgba(59,42,32,0.28), 0 0 0 1px rgba(59,42,32,0.12);
+    background: var(--parchment);
+    overflow:hidden;
+  }
+  canvas{
+    display:block;
+    background: transparent;
+  }
+  .hud{
+    position:absolute;
+    top: 14px;
+    left: 0; right:0;
+    display:flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    pointer-events:none;
+    font-family: 'Cormorant Garamond', serif;
+  }
+  .hud .score{
+    font-size: 1.8rem;
+    font-weight:600;
+    color: var(--maroon);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .hud .pitch-readout{
+    text-align:right;
+    font-size: 1rem;
+    color: var(--ink);
+    background: rgba(239,230,211,0.85);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 10px;
+    line-height: 1.3;
+  }
+  .pitch-readout b{ color: var(--maroon); font-size:1.15rem; }
+
+  .overlay{
+    position:absolute; inset:0;
+    background: rgba(239,230,211,0.94);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding: 20px;
+    gap: 14px;
+  }
+  .overlay h2{
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight:600;
+    color: var(--maroon);
+    font-size: clamp(1.4rem, 3.2vw, 2rem);
+    margin: 0;
+  }
+  .overlay p{ max-width: 480px; line-height:1.55; margin: 0; font-size:0.98rem; }
+  .note-legend{
+    display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-width:480px;
+  }
+  .note-chip{
+    font-size:0.8rem; padding:3px 9px; border:1px solid var(--line); border-radius: 999px;
+    background: var(--parchment-dark);
+  }
+  button.primary{
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight:600;
+    font-size: 1.15rem;
+    color: var(--parchment);
+    background: linear-gradient(180deg, var(--maroon), #5c1725);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 34px;
+    cursor:pointer;
+    box-shadow: 0 6px 16px rgba(122,35,51,0.35);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  button.primary:hover{ transform: translateY(-1px); box-shadow: 0 9px 20px rgba(122,35,51,0.42); }
+  button.primary:active{ transform: translateY(0px); }
+  .mic-status{
+    font-size:0.85rem;
+    color: var(--ink);
+    opacity:0.7;
+  }
+  .final-score{
+    font-family:'Cormorant Garamond', serif;
+    font-size: 2.6rem;
+    font-weight:600;
+    color: var(--maroon);
+  }
+  footer{
+    margin-top:10px;
+    font-size:0.78rem;
+    opacity:0.55;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Skripka Flappy</h1>
+  <div class="subtitle">Səsinin tezliyi ilə quşu idarə et. Hər boru cütü müəyyən bir nota tələb edir — o notanı çal (və ya oxu), quş həmin hündürlüyə qalxsın.</div>
+
+  <div class="stage-wrap">
+    <canvas id="game" width="720" height="480"></canvas>
+
+    <div class="hud">
+      <div class="score" id="scoreEl">0</div>
+      <div class="pitch-readout" id="pitchEl">— <br><b>—</b></div>
+    </div>
+
+    <div class="overlay" id="startOverlay">
+      <h2>Başlamazdan əvvəl</h2>
+      <p>Mikrofon icazəsi lazımdır. Skripkanı yaxınlaşdır və ya səslə oxu — proqram avtomatik tezliyi (Hz) tutub notaya çevirəcək.</p>
+      <div class="note-legend" id="legend"></div>
+      <button class="primary" id="startBtn">Mikrofonu aç və başla</button>
+      <div class="mic-status" id="micStatus"></div>
+    </div>
+
+    <div class="overlay" id="overOverlay" style="display:none;">
+      <h2>Oyun bitdi</h2>
+      <div class="final-score" id="finalScore">0</div>
+      <p id="overNote"></p>
+      <button class="primary" id="retryBtn">Yenidən cəhd et</button>
+    </div>
+  </div>
+  <footer>Diapazon: G3 (196 Hz) — E5 (659 Hz), skripkanın açıq simləri arasındakı zona</footer>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const NOTE_MARGIN_L = 46;
+  const PLAY_TOP = 24;
+  const PLAY_BOTTOM = H - 24;
+
+  // Notes usable for both the staff grid and pipe targets (G3 -> E5)
+  const NOTES = [
+    {name:'G3', freq:196.00},
+    {name:'A3', freq:220.00},
+    {name:'B3', freq:246.94},
+    {name:'C4', freq:261.63},
+    {name:'D4', freq:293.66},
+    {name:'E4', freq:329.63},
+    {name:'F#4', freq:369.99},
+    {name:'G4', freq:392.00},
+    {name:'A4', freq:440.00},
+    {name:'B4', freq:493.88},
+    {name:'C5', freq:523.25},
+    {name:'D5', freq:587.33},
+    {name:'E5', freq:659.25},
+  ];
+  const MIN_F = NOTES[0].freq * 0.94;
+  const MAX_F = NOTES[NOTES.length-1].freq * 1.06;
+
+  function freqToY(freq){
+    const f = Math.max(MIN_F, Math.min(MAX_F, freq));
+    const t = (Math.log2(f) - Math.log2(MIN_F)) / (Math.log2(MAX_F) - Math.log2(MIN_F));
+    return PLAY_BOTTOM - t * (PLAY_BOTTOM - PLAY_TOP);
+  }
+
+  // legend
+  const legend = document.getElementById('legend');
+  NOTES.forEach(n=>{
+    const chip = document.createElement('div');
+    chip.className = 'note-chip';
+    chip.textContent = n.name + ' · ' + Math.round(n.freq) + 'Hz';
+    legend.appendChild(chip);
+  });
+
+  // ---------- Audio / pitch detection ----------
+  let audioCtx, analyser, micStream, dataBuf;
+  let smoothedFreq = 0;
+  let lastConfidentFreq = 0;
+  let hasSignal = false;
+
+  async function initMic(){
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    dataBuf = new Float32Array(analyser.fftSize);
+  }
+
+  function autoCorrelate(buf, sampleRate){
+    const SIZE = buf.length;
+    let rms = 0;
+    for (let i=0;i<SIZE;i++) rms += buf[i]*buf[i];
+    rms = Math.sqrt(rms/SIZE);
+    if (rms < 0.012) return -1;
+
+    let r1=0, r2=SIZE-1;
+    const thres = 0.2;
+    for (let i=0;i<SIZE/2;i++){ if (Math.abs(buf[i])<thres){ r1=i; break; } }
+    for (let i=1;i<SIZE/2;i++){ if (Math.abs(buf[SIZE-i])<thres){ r2=SIZE-i; break; } }
+    const trimmed = buf.slice(r1, r2);
+    const n = trimmed.length;
+    if (n < 8) return -1;
+
+    const c = new Float32Array(n);
+    for (let lag=0; lag<n; lag++){
+      let sum = 0;
+      for (let i=0; i<n-lag; i++) sum += trimmed[i]*trimmed[i+lag];
+      c[lag] = sum;
+    }
+
+    let d = 0;
+    while (d < n-1 && c[d] > c[d+1]) d++;
+
+    let maxVal = -1, maxPos = -1;
+    for (let i=d; i<n; i++){
+      if (c[i] > maxVal){ maxVal = c[i]; maxPos = i; }
+    }
+    if (maxPos <= 0) return -1;
+
+    let T0 = maxPos;
+    if (maxPos > 0 && maxPos < n-1){
+      const x1=c[maxPos-1], x2=c[maxPos], x3=c[maxPos+1];
+      const a=(x1+x3-2*x2)/2, b=(x3-x1)/2;
+      if (a !== 0) T0 = maxPos - b/(2*a);
+    }
+    const freq = sampleRate / T0;
+    if (freq < 60 || freq > 1500) return -1;
+    return freq;
+  }
+
+  function nearestNoteName(freq){
+    if (!freq || freq<=0) return '—';
+    const midi = 69 + 12*Math.log2(freq/440);
+    const rounded = Math.round(midi);
+    const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const name = names[(rounded%12+12)%12];
+    const octave = Math.floor(rounded/12) - 1;
+    return name + octave;
+  }
+
+  function updatePitch(){
+    if (!analyser) return;
+    analyser.getFloatTimeDomainData(dataBuf);
+    const f = autoCorrelate(dataBuf, audioCtx.sampleRate);
+    if (f > 0){
+      hasSignal = true;
+      lastConfidentFreq = f;
+      smoothedFreq = smoothedFreq ? smoothedFreq*0.65 + f*0.35 : f;
+    } else {
+      hasSignal = false;
+    }
+  }
+
+  // ---------- Game state ----------
+  let birdY = H/2;
+  let birdTargetY = H/2;
+  const BIRD_X = 150;
+  const BIRD_R = 14;
+  let velocitySmoothing = 0.16;
+
+  let pipes = [];
+  const PIPE_GAP = 140;
+  const PIPE_W = 46;
+  let pipeSpeed = 2.6;
+  let frame = 0;
+  let score = 0;
+  let running = false;
+  let gameOver = false;
+
+  function spawnPipe(){
+    const note = NOTES[Math.floor(Math.random()*NOTES.length)];
+    const gapCenterY = freqToY(note.freq);
+    pipes.push({
+      x: W + 40,
+      note: note,
+      gapCenterY: gapCenterY,
+      passed: false
+    });
+  }
+
+  function resetGame(){
+    pipes = [];
+    score = 0;
+    frame = 0;
+    pipeSpeed = 2.6;
+    birdY = H/2;
+    birdTargetY = H/2;
+    gameOver = false;
+    spawnPipe();
+  }
+
+  function drawStaff(){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(59,42,32,0.28)';
+    ctx.lineWidth = 1;
+    ctx.font = "13px 'EB Garamond', serif";
+    ctx.fillStyle = 'rgba(59,42,32,0.65)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    NOTES.forEach(n=>{
+      const y = freqToY(n.freq);
+      ctx.beginPath();
+      ctx.moveTo(NOTE_MARGIN_L, y);
+      ctx.lineTo(W-10, y);
+      ctx.stroke();
+      ctx.fillText(n.name, 8, y);
+    });
+    ctx.restore();
+  }
+
+  function drawPipe(p){
+    const gapTop = p.gapCenterY - PIPE_GAP/2;
+    const gapBottom = p.gapCenterY + PIPE_GAP/2;
+
+    ctx.save();
+    const grad = ctx.createLinearGradient(p.x,0,p.x+PIPE_W,0);
+    grad.addColorStop(0, '#6b4a36');
+    grad.addColorStop(0.5, '#5C4030');
+    grad.addColorStop(1, '#4a3226');
+    ctx.fillStyle = grad;
+
+    // top pillar
+    ctx.fillRect(p.x, PLAY_TOP-10, PIPE_W, Math.max(0, gapTop-(PLAY_TOP-10)));
+    // bottom pillar
+    ctx.fillRect(p.x, gapBottom, PIPE_W, Math.max(0, (PLAY_BOTTOM+10)-gapBottom));
+
+    // scroll caps
+    ctx.fillStyle = '#3E2A1F';
+    ctx.fillRect(p.x-3, gapTop-14, PIPE_W+6, 14);
+    ctx.fillRect(p.x-3, gapBottom, PIPE_W+6, 14);
+
+    // note label at gap
+    ctx.fillStyle = '#7A2333';
+    ctx.font = "bold 15px 'Cormorant Garamond', serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.note.name, p.x + PIPE_W/2, p.gapCenterY);
+    ctx.restore();
+  }
+
+  function drawBird(){
+    ctx.save();
+    ctx.translate(BIRD_X, birdY);
+    // eighth-note glyph
+    ctx.fillStyle = hasSignal ? '#C9A44C' : '#9c8256';
+    ctx.strokeStyle = '#3E2A1F';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 9, 6.5, -0.35, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(7,4);
+    ctx.lineTo(7,-24);
+    ctx.lineTo(10,-24);
+    ctx.quadraticCurveTo(16,-16, 9,-8);
+    ctx.lineTo(9,4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function loop(){
+    if (!running) return;
+    frame++;
+    updatePitch();
+
+    if (hasSignal){
+      birdTargetY = freqToY(smoothedFreq);
+    } else {
+      birdTargetY += 2.2; // gentle gravity fall when silent
+    }
+    birdTargetY = Math.max(PLAY_TOP+BIRD_R, Math.min(PLAY_BOTTOM-BIRD_R, birdTargetY));
+    birdY += (birdTargetY - birdY) * velocitySmoothing;
+
+    // move pipes
+    pipes.forEach(p => p.x -= pipeSpeed);
+    if (pipes.length && pipes[pipes.length-1].x < W - 280){
+      spawnPipe();
+    }
+    pipes = pipes.filter(p => p.x > -PIPE_W - 20);
+
+    // collision + scoring
+    for (const p of pipes){
+      const withinX = BIRD_X + BIRD_R > p.x && BIRD_X - BIRD_R < p.x + PIPE_W;
+      if (withinX){
+        const gapTop = p.gapCenterY - PIPE_GAP/2;
+        const gapBottom = p.gapCenterY + PIPE_GAP/2;
+        if (birdY - BIRD_R < gapTop || birdY + BIRD_R > gapBottom){
+          endGame();
+          return;
+        }
+      }
+      if (!p.passed && p.x + PIPE_W < BIRD_X - BIRD_R){
+        p.passed = true;
+        score++;
+        pipeSpeed = Math.min(5.2, pipeSpeed + 0.06);
+        document.getElementById('scoreEl').textContent = score;
+      }
+    }
+
+    // render
+    ctx.clearRect(0,0,W,H);
+    drawStaff();
+    pipes.forEach(drawPipe);
+    drawBird();
+
+    const readout = document.getElementById('pitchEl');
+    if (hasSignal){
+      readout.innerHTML = Math.round(smoothedFreq) + ' Hz <br><b>' + nearestNoteName(smoothedFreq) + '</b>';
+    } else {
+      readout.innerHTML = 'səssiz <br><b>—</b>';
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  function endGame(){
+    running = false;
+    gameOver = true;
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('overNote').textContent = score === 0
+      ? 'Boruların arasından keçmək üçün lazımi notanı dəqiq tut.'
+      : 'Yaxşı nəticə! Diapazonu genişləndirmək üçün yenidən cəhd et.';
+    document.getElementById('overOverlay').style.display = 'flex';
+  }
+
+  function startGame(){
+    document.getElementById('startOverlay').style.display = 'none';
+    document.getElementById('overOverlay').style.display = 'none';
+    resetGame();
+    running = true;
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('micStatus');
+    try{
+      statusEl.textContent = 'Mikrofon icazəsi gözlənilir...';
+      await initMic();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      statusEl.textContent = '';
+      startGame();
+    } catch(err){
+      statusEl.textContent = 'Mikrofona giriş alınmadı: ' + err.message;
+    }
+  });
+
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    startGame();
+  });
+
+  // initial static draw
+  drawStaff();
+})();
+</script>
+</body>
+</html>
+</file>
+
+<file path="pitchy-bird/index.html">
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skripka Flappy — Nota ilə Uç</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <h1>Skripka Flappy</h1>
+  <div class="subtitle">Səsinin tezliyi ilə quşu idarə et. Hər boru cütü müəyyən bir nota tələb edir — o notanı çal (və ya oxu), quş həndətmiş hündürlüyə qalxsın.</div>
+
+  <div class="stage-wrap">
+    <canvas id="game" width="720" height="480"></canvas>
+
+    <div class="hud">
+      <div class="score" id="scoreEl">0</div>
+      <div class="pitch-readout" id="pitchEl">— <br><b>—</b></div>
+    </div>
+
+    <div class="overlay" id="startOverlay">
+      <h2>Başlamazdan əvvəl</h2>
+      <p>Mikrofon icazəsi lazımdır. Skripkanı yaxınlaşdır və ya səslə oxu — proqram avtomatik tezliyi (Hz) tutub notaya çevirəcək.</p>
+      <div class="note-legend" id="legend"></div>
+      <button class="primary" id="startBtn">Mikrofonu aç və başla</button>
+      <div class="mic-status" id="micStatus"></div>
+    </div>
+
+    <div class="overlay" id="overOverlay" style="display:none;">
+      <h2>Oyun bitdi</h2>
+      <div class="final-score" id="finalScore">0</div>
+      <p id="overNote"></p>
+      <button class="primary" id="retryBtn">Yenidən cəhd et</button>
+    </div>
+  </div>
+  <footer>Diapazon: G3 (196 Hz) — E5 (659 Hz), skripkanın açıq simləri arasındakı zona</footer>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
+</file>
+
+<file path="pitchy-bird/package.json">
+{
+  "name": "pitchy-bird",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
+</file>
+
+<file path="pitchy-bird/README.md">
+# Pitchy Bird
+
+**Skripka Flappy — Nota ilə Uç**
+
+Mikrofon vasitəsi ilə tutulan səs tezliyi ilə idarə olunan Flappy Bird tipli oyun. Hədəf auditoriya skripka öyrənənlərdir.
+
+## Qurulama
+
+```bash
+npm install
+npm run dev
+```
+
+Oyun avtomatik olaraq `http://localhost:5173` adresinə açılacaq.
+
+## Fayl Strukturu
+
+```
+pitchy-bird/
+├── index.html          # SKELETON + script bağlantıları
+├── style.css           # Çəkmə və skrupka teması
+├── vite.config.js
+├── src/
+│   ├── audio/
+│   │   ├── constants.js       # NOTES, MIN_FREQ, MAX_FREQ, TOLERANCE_SEMITONES
+│   │   ├── PitchDetector.js   # Mikrofon → {frequency, midiNote, confidence, timestamp}
+│   │   └── NoteMatcher.js     # freq → MIDI, semitone fərqi, tolerantlıq məntiqi
+│   ├── game/
+│   │   ├── Bird.js             # Mövqe, delta-time hamarlama
+│   │   ├── Pipe.js
+│   │   ├── GameLoop.js
+│   │   └── CollisionSystem.js  # Semitone-tolerant keçid Qianası
+│   ├── render/
+│   │   └── Renderer.js         # Canvas çəkmə
+│   └── ui/
+│       └── HUD.js              # Skor, overlay-lər, debug gostəriciller
+└── main.js                       # Giriş nöqtəsi
+```
+
+## Konfiqurasiya Edilən Parametrlər
+
+```
+src/audio/constants.js
+├── TOLERANCE_SEMITONES = 0.5   # Pipe keçid tolerantlığı (yarım ton)
+├── SIGNAL_LOSS_FRAMES = 5      # "Səssizlik"_choice iż sém chão
+├── OCTAVE_RATIO_MIN = 0.45     # Oktava-xətası filtrinin alt hədd
+├── OCTAVE_RATIO_MAX = 2.2      # Oktava-xətası filtrinin üst hədd
+└── SMOOTHING_FACTOR = 0.12     # Quşun Y hamarlama əmsalı
+```
+
+### Tənzimləmə
+
+Bu parametrləri `src/audio/constants.js` fayl quitterinde `export const` blok unfoldeddaction:
+
+```javascript
+export const TOLERANCE_SEMITONES = 0.5;   // 0.5 = yarım ton, 1.0 = tam ton
+export const SIGNAL_LOSS_FRAMES = 5;      // 3-7 arası təstiq’intention müddətidən
+#### scarcely
+export const OCTAVE_RATIO_MIN = 0.45;
+export const OCTAVE_RATIO_MAX = 2.2;
+export const SMOOTHING_FACTOR = 0.12;     // 0.1-0.2 arası təqdimat
+```
+
+## Qurbanası
+
+Oyunda aşağıdakı məlumatlar canlı olaraq göstərilir:
+
+- **Raw frequency**: Mikrofon üçün cima Toenış (Hz)
+- **Filtered frequency**: Hesablanış filtrərli tezlik
+- **Detected note**: Tutulan nota (MIDI nömrisi)
+- **Target note**: Boru tələb eden nota
+- **Semitone diff**: Ərasadə stava (∞ = məcburi yoxdur)
+
+## Versiya Tarixçəsi
+
+- **v0.1.0** — Modul struktura واحدًا, Problem 1 (nota tolerantlıq) və Problem 2 (quşun hərağı) həll øldurda.
+
+## Əsas HARAMDAR
+
+- [ ] Fawell teslamını artisan
+- [ ] İlan gelən colonnes
+- [ ] Məlumat intéq eləUE
+</file>
+
+<file path="pitchy-bird/style.css">
+:root{
+  --parchment: #EFE6D3;
+  --parchment-dark: #E3D6BC;
+  --ink: #3B2A20;
+  --walnut: #5C4030;
+  --walnut-dark: #3E2A1F;
+  --maroon: #7A2333;
+  --gold: #C9A44C;
+  --gold-bright: #E4C878;
+  --line: rgba(59,42,32,0.55);
+}
+*{ box-sizing: border-box; }
+html,body{
+  margin:0; padding:0; height:100%;
+  background: radial-gradient(ellipse at 50% -10%, #FBF6E9 0%, var(--parchment) 55%, var(--parchment-dark) 100%);
+  font-family: 'EB Garamond', serif;
+  color: var(--ink);
+  overflow: hidden;
+}
+#app{
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  height: 100vh;
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  justify-content:center;
+}
+h1{
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-style: italic;
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  letter-spacing: 0.02em;
+  color: var(--maroon);
+  margin: 0 0 2px 0;
+  text-align:center;
+}
+.subtitle{
+  font-size: 0.95rem;
+  color: var(--ink);
+  opacity: 0.75;
+  margin-bottom: 14px;
+  text-align:center;
+  max-width: 520px;
+  line-height:1.4;
+}
+.stage-wrap{
+  position: relative;
+  border-radius: 6px;
+  box-shadow: 0 18px 40px rgba(59,42,32,0.28), 0 0 0 1px rgba(59,42,32,0.12);
+  background: var(--parchment);
+  overflow:hidden;
+}
+canvas{
+  display:block;
+  background: transparent;
+}
+.hud{
+  position:absolute;
+  top: 14px;
+  left: 0; right:0;
+  display:flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  pointer-events:none;
+  font-family: 'Cormorant Garamond', serif;
+}
+.hud .score{
+  font-size: 1.8rem;
+  font-weight:600;
+  color: var(--maroon);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+}
+.hud .pitch-readout{
+  text-align:right;
+  font-size:1rem;
+  color: var(--ink);
+  background: rgba(239,230,211,0.85);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 10px;
+  line-height: 1.3;
+}
+.pitch-readout b{ color: var(--maroon); font-size:1.15rem; }
+.overlay{
+  position:absolute; inset:0;
+  background: rgba(239,230,211,0.94);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding: 20px;
+  gap: 14px;
+}
+.overlay h2{
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight:600;
+  color: var(--maroon);
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  margin: 0;
+}
+.overlay p{ max-width: 480px; line-height:1.55; margin: 0; font-size:0.98rem; }
+.note-legend{
+  display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-width:480px;
+}
+.note-chip{
+  font-size:0.8rem; padding:3px 9px; border:1px solid var(--line); border-radius: 999px;
+  background: var(--parchment-dark);
+}
+button.primary{
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight:600;
+  font-size: 1.15rem;
+  color: var(--parchment);
+  background: linear-gradient(180deg, var(--maroon), #5c1725);
+  border: none;
+  border-radius: 999px;
+  padding: 12px 34px;
+  cursor:pointer;
+  box-shadow: 0 6px 16px rgba(122,35,51,0.35);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+button.primary:hover{ transform: translateY(-1px); box-shadow: 0 9px 20px rgba(122,35,51,0.42); }
+button.primary:active{ transform: translateY(0px); }
+.mic-status{
+  font-size:0.85rem;
+  color: var(--ink);
+  opacity:0.7;
+}
+.final-score{
+  font-family:'Cormorant Garamond', serif;
+  font-size: 2.6rem;
+  font-weight:600;
+  color: var(--maroon);
+}
+footer{
+  margin-top:10px;
+  font-size:0.78rem;
+  opacity:0.55;
+  text-align:center;
+}
+</file>
+
+<file path="pitchy-bird/vite.config.js">
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  root: './',
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
+  server: {
+    open: true,
+    port: 5173,
+  },
+});
+</file>
+
+</files>
