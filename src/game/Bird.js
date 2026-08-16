@@ -1,51 +1,61 @@
-import { freqToY } from '../audio/constants.js';
+/*
+ * QUŞ
+ *
+ * Mövqe tamamilə perdədən gəlir. Ölçülər difficulty.js-dən —
+ * burada sabit rəqəm yoxdur.
+ *
+ * İki ayrı rejim, heç vaxt eyni anda:
+ *   SƏS VAR → perdəyə doğru hamarlanır, cazibə yoxdur
+ *   SƏS YOX → yalnız cazibə, hamarlama tamam söndürülür
+ */
 
 export class Bird {
-  constructor(options = {}) {
-    this.width = options.width || 720;
-    this.height = options.height || 480;
+  constructor({ mapping, geometry, birdX }) {
+    this.configure({ mapping, geometry, birdX });
+    this.reset();
+  }
 
-    this.playTop = 24;
-    this.playBottom = this.height - 24;
-    this.birdRadius = 14;
-    this.birdX = 150;
+  configure({ mapping, geometry, birdX }) {
+    this.mapping = mapping;
+    this.geometry = geometry;
+    this.extentUp = geometry.extentUp;
+    this.extentDown = geometry.extentDown;
+    this.birdX = birdX;
 
-    this.y = this.height / 2;
-    this.targetY = this.height / 2;
-    this.velocity = 0;
-
-    this.smoothingFactor = 0.12;
-    this.gravity = 0.018;      // sükut zamanı düşmə sürəti (0.015-0.02 aralığı)
-    this.maxFallSpeed = 2.5;   // maksimal düşmə sürəti (2-3 aralığı)
-
-    this.filteredFreq = 0;
-    this.freqHistory = [];
+    this.smoothingFactor = 0.35;
+    this.gravity = 0.02;
+    this.maxFallSpeed = 2.8;
     this.maxHistory = 5;
-
-    this.lastReading = null;
   }
 
   reset() {
-    this.y = this.height / 2;
-    this.targetY = this.height / 2;
+    const mid = (this.mapping.playTop + this.mapping.playBottom) / 2;
+    this.y = mid;
+    this.targetY = mid;
     this.velocity = 0;
     this.filteredFreq = 0;
     this.freqHistory = [];
     this.lastReading = null;
   }
 
-  /* İki ayrı rejim:
-       SƏS VAR  → quş perde hündürlüyünə doğru hamarlanır, cazibə yoxdur
-       SƏS YOX  → yalnız cazibə işləyir, hamarlama tamamilə söndürülür
+  /* Quş oyun sahəsindən çıxa bilməz. Sərhəddə DAYANMAQ ölüm demək
+     deyil — ölüm qərarını CollisionSystem verir (döşəmə/tavan). */
+  clampY(y) {
+    return Math.max(
+      this.mapping.playTop + this.extentUp,
+      Math.min(this.mapping.floorY - this.extentDown, y)
+    );
+  }
 
-     Əvvəl hər iki qüvvə eyni anda tətbiq olunurdu. Nəticədə sükut zamanı
-     hamarlama quşu son notanın hündürlüyündə saxlayır, cazibə isə onu
-     aşağı çəkirdi — iki qüvvə ~21 piksel sonra tarazlaşır və quş düşməyi
-     dayandırırdı. Bu, A1 düzəlişindən sonra üzə çıxdı (M0). */
+
+  getMedian(values) {
+    if (!values.length) return 0;
+    const sorted = values.slice().sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  }
+
   update(deltaMs, reading) {
-    const dt = deltaMs / 1000;
-    const frameScale = dt * 60;
-
+    const frameScale = (deltaMs / 1000) * 60;
     this.lastReading = reading;
 
     const hasSignal = !!(reading && reading.frequency > 0);
@@ -53,20 +63,14 @@ export class Bird {
     if (hasSignal) {
       this.filteredFreq = reading.frequency;
       this.freqHistory.push(reading.frequency);
-      if (this.freqHistory.length > this.maxHistory) {
-        this.freqHistory.shift();
-      }
+      if (this.freqHistory.length > this.maxHistory) this.freqHistory.shift();
 
-      const medianFreq = this.getMedian(this.freqHistory);
-      const targetFreq = medianFreq || this.filteredFreq;
-
-      const targetY = freqToY(targetFreq, this.playTop, this.playBottom);
-      this.targetY = this.clampY(targetY);
+      const targetFreq = this.getMedian(this.freqHistory) || this.filteredFreq;
+      this.targetY = this.clampY(this.mapping.freqToY(targetFreq));
 
       this.velocity = 0;
       this.y += (this.targetY - this.y) * this.smoothingFactor;
     } else {
-      /* Sükut: köhnə frekans tarixçəsi növbəti notanı çirkləndirməsin */
       this.filteredFreq = 0;
       this.freqHistory.length = 0;
 
@@ -78,41 +82,6 @@ export class Bird {
     this.y = this.clampY(this.y);
   }
 
-  clampY(y) {
-    return Math.max(
-      this.playTop + this.birdRadius,
-      Math.min(this.playBottom - this.birdRadius, y)
-    );
-  }
-
-  getMedian(arr) {
-    if (!arr.length) return 0;
-    const sorted = [...arr].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  }
-
-  getY() {
-    return this.y;
-  }
-
-  getTargetY() {
-    return this.targetY;
-  }
-
-  getX() {
-    return this.birdX;
-  }
-
-  getRadius() {
-    return this.birdRadius;
-  }
-
-  getFilteredFrequency() {
-    return this.filteredFreq;
-  }
-
-  isAlive() {
-    return this.y >= this.playTop + this.birdRadius && this.y <= this.playBottom - this.birdRadius;
-  }
+  getY() { return this.y; }
+  hasSignal() { return this.filteredFreq > 0; }
 }

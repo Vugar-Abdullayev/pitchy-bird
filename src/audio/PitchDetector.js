@@ -1,4 +1,4 @@
-import { NOTES } from '../audio/constants.js';
+import { MIN_FREQ, MAX_FREQ } from './constants.js';
 
 export class PitchDetector {
   constructor() {
@@ -13,15 +13,22 @@ export class PitchDetector {
     this.currentFreq = 0;
     this.lastValidFreq = 0;
     this.confidence = 0;
-    this.hysteresis = 0;
+    this.pendingFreq = 0;
+    this.pendingFrames = 0;
     this.silentFrames = 0;
     this.lastStrongFreq = 0;
 
     this.smoothingFactor = 0.4;
 
-    this.octaveRatioMin = 0.45;
-    this.octaveRatioMax = 2.2;
-    this.invOctaveRatioMax = 1 / this.octaveRatioMin;
+    /* Bundan böyük dəyişiklik "sıçrayış" sayılır və təsdiq tələb edir.
+       1.26 ≈ 4 yarım ton. Təsdiq 2 kadr = ~33 ms, hiss olunmur. */
+    this.jumpRatioMax = 1.26;
+    this.jumpConfirmFrames = 2;
+    this.pendingFreq = 0;
+    this.pendingFrames = 0;
+
+    /* Neçə kadr səssizlikdən sonra "səs kəsildi" deyirik */
+    this.signalLossFrames = 3;
 
     this._rafId = null;
     this.debugLog = true;   // müvəqqəti — M1-də normal göstərici ilə əvəz olunur
@@ -38,8 +45,14 @@ export class PitchDetector {
     /* Təpə seçimi: ən güclünün bu nisbətini keçən ilk təpə seçilir */
     this.peakPickRatio = 0.9;
 
-    this.minFrequency = 196;
-    this.maxFrequency = 659;
+    /* Oyunun nota diapazonu — TƏK MƏNBƏ constants.js-dir.
+       Əvvəl burada 196 və 659 yazılmışdı. E5 əslində 659.25 Hz olduğu üçün
+       ən yuxarı nota heç vaxt oyuna çatmırdı; G3 də eyni səbəbdən kəsilirdi
+       (alqoritm 195.9 qaytarır). MIN_FREQ/MAX_FREQ hər iki tərəfə təxminən
+       bir yarım ton pay verir — şagird bemol çalanda "səsin yoxdur" yox,
+       "sən aşağı çalırsan" geri bildirişi ala bilsin. */
+    this.minFrequency = MIN_FREQ;
+    this.maxFrequency = MAX_FREQ;
 
     // Energy/volume thresholds for voice detection
     this.minRMSThreshold = 0.005;       // Minimum RMS energy to consider signal (was 0.01, lowered for sensitivity)
@@ -278,40 +291,68 @@ export class PitchDetector {
 
     if (!frequency || frequency < this.minFrequency || frequency > this.maxFrequency) {
       this.silentFrames++;
-      if (this.silentFrames >= 3) {
-        this.hysteresis = 0;
+      if (this.silentFrames >= this.signalLossFrames) {
         this.currentFreq = 0;
         this.confidence = 0;
-        /* Oktav-sıçrayış referansını da sıfırlayırıq: fasilədən sonra gələn
-           ilk nota köhnə notaya görə "sıçrayış" sayılmamalıdır. */
+        /* Fasilədən sonra gələn ilk nota köhnə notaya görə
+           "sıçrayış" sayılmamalıdır. */
         this.lastStrongFreq = 0;
+        this.pendingFreq = 0;
+        this.pendingFrames = 0;
       }
       return;
     }
 
     this.silentFrames = 0;
 
-    const ratio = frequency / (this.lastStrongFreq || 1);
-    const invRatio = 1 / ratio;
+    /* Alqoritm özü əmin deyilsə, heç nə etmirik */
+    if (confidence <= this.minConfidence) {
+      return;
+    }
 
-    const isOctaveJump = this.lastStrongFreq > 0 && (
-      ratio > this.octaveRatioMax ||
-      ratio < this.octaveRatioMin ||
-      invRatio > this.invOctaveRatioMax
-    );
+    const ratio = this.lastStrongFreq > 0 ? frequency / this.lastStrongFreq : 1;
+    const isBigJump = ratio > this.jumpRatioMax || ratio < 1 / this.jumpRatioMax;
 
-    if (confidence > this.minConfidence && !isOctaveJump) {
-      this.hysteresis = Math.max(0, this.hysteresis - 1);
+    if (isBigJump) {
+      /* Böyük sıçrayış REDD EDİLMİR — TƏSDİQ EDİLİR.
+         Köhnə məntiq "2.2 dəfədən böyük dəyişiklik səhvdir" deyirdi.
+         Bu, G3→E5 kimi real musiqi sıçrayışını əbədi bloklayırdı və
+         referans yenilənmədiyi üçün sistem birdəfəlik kilidlənirdi.
+         MPM oktav səhvi vermədiyi üçün belə sərt qadağaya ehtiyac yoxdur:
+         yeni tezlik ardıcıl kadrlarda təkrarlanırsa, deməli həqiqidir. */
+      const sameAsPending = this.pendingFreq > 0 &&
+        Math.abs(1200 * Math.log2(frequency / this.pendingFreq)) < 100;
 
-      if (this.hysteresis === 0) {
+      if (sameAsPending) {
+        this.pendingFrames++;
+      } else {
+        this.pendingFreq = frequency;
+        this.pendingFrames = 1;
+      }
+
+      if (this.pendingFrames >= this.jumpConfirmFrames) {
+        /* Təsdiqləndi: yeni notaya dərhal keçirik.
+           Hamarlamanı burada tətbiq etmirik — əks halda quş köhnə
+           nota ilə yeni nota arasında uzun müddət asılı qalır. */
         this.lastStrongFreq = frequency;
-        this.currentFreq = this.currentFreq ? this.smoothingFactor * frequency + (1 - this.smoothingFactor) * this.currentFreq : frequency;
+        this.currentFreq = frequency;
         this.confidence = confidence;
         this.lastValidFreq = frequency;
+        this.pendingFreq = 0;
+        this.pendingFrames = 0;
       }
-    } else {
-      this.hysteresis = Math.min(5, this.hysteresis + 1);
+      return;
     }
+
+    /* Normal hal: kiçik dəyişiklik, hamar keçid */
+    this.pendingFreq = 0;
+    this.pendingFrames = 0;
+    this.lastStrongFreq = frequency;
+    this.currentFreq = this.currentFreq
+      ? this.smoothingFactor * frequency + (1 - this.smoothingFactor) * this.currentFreq
+      : frequency;
+    this.confidence = confidence;
+    this.lastValidFreq = frequency;
   }
 
   /* Cari oxunuş. Səs yoxdursa frequency = 0 qaytarır.

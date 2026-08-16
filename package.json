@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:report": "node test/report.mjs",
-    "test:stress": "node test/stress.mjs"
+    "test:stress": "node test/stress.mjs",
+    "test:pipeline": "node test/pipeline.mjs",
+    "test": "node test/report.mjs && node test/stress.mjs && node test/pipeline.mjs"
   },
   "devDependencies": {
     "vite": "^5.0.0"

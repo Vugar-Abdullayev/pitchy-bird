@@ -145,3 +145,48 @@ footer{
   opacity:0.55;
   text-align:center;
 }
+
+/* ── TAM EKRAN DÜZƏNİ ────────────────────────────────────────────
+   Canvas artıq sabit 720×480 deyil. Bütün görünən sahəni tutur,
+   ölçüsünü JS oxuyub modeli ona görə qurur. */
+html, body { height: 100%; margin: 0; }
+
+#app {
+  height: 100vh;
+  height: 100dvh;          /* mobil brauzerlərdə ünvan sətrini nəzərə alır */
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#app > h1, #app > .subtitle, #app > footer { display: none; }
+
+.stage-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  position: relative;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hud { pointer-events: none; }
+
+/* ── PERDƏ PANELİ ────────────────────────────────────────────── */
+.hud .pitch-readout { min-width: 118px; }
+.pitch-readout .ro-freq   { font-size: 1.35rem; line-height: 1.15; }
+.pitch-readout .ro-note   { line-height: 1.1; margin-bottom: 2px; }
+.pitch-readout .ro-sub    { font-size: 0.85rem; opacity: 0.85; }
+.pitch-readout .ro-level  { font-size: 0.72rem; opacity: 0.6; margin-top: 3px; }
+.pitch-readout .ok  { color: #2E7D52; }
+.pitch-readout .off { color: var(--maroon); }

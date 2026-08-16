@@ -1,75 +1,90 @@
-import { freqToY, NOTES } from '../audio/constants.js';
+/*
+ * BORULAR
+ *
+ * Bütün ölçülər difficulty.js-dən gəlir — burada sabit rəqəm yoxdur.
+ * Əvvəl pipeGap=140, pipeWidth=46 kimi rəqəmlər həm burada, həm
+ * Bird-də, həm Renderer-də ayrıca yazılmışdı; birini dəyişəndə
+ * digərləri səssizcə fərqlənirdi.
+ *
+ * Hərəkət deltaMs ilə hesablanır. Əvvəl kadr başına sabit piksel
+ * idi — 120 Hz ekranda oyun iki dəfə sürətli işləyirdi.
+ */
 
 export class Pipe {
-  constructor(notes, options = {}) {
-    this.notes = notes || NOTES;
-    this.width = options.width || 720;
-    this.height = options.height || 480;
-
-    this.playTop = 24;
-    this.playBottom = this.height - 24;
-
-    this.pipeWidth = 46;
-    this.pipeGap = 140;
-    this.pipeSpeed = 2.6;
-    this.spawnX = this.width + 40;
-
+  constructor({ mapping, level, geometry, melody, width }) {
+    this.configure({ mapping, level, geometry, melody, width });
     this.list = [];
-    this.passedNote = null;
-    this.difficulty = 0;
+    this.timeSinceSpawn = 0;
+  }
+
+  configure({ mapping, level, geometry, melody, width }) {
+    this.mapping = mapping;
+    this.level = level;
+    this.geometry = geometry;
+    this.melody = melody;
+    this.width = width;
+    this.spawnX = width + 40;
   }
 
   reset() {
     this.list = [];
-    this.pipeSpeed = 2.6;
-    this.difficulty = 0;
+    this.timeSinceSpawn = 0;
+    this.melody.reset();
     this.spawnPipe();
   }
 
   spawnPipe() {
-    const note = this.notes[Math.floor(Math.random() * this.notes.length)];
-    const gapCenterY = freqToY(note.freq, this.playTop, this.playBottom);
+    const note = this.melody.next();
+    if (!note) return;
+
+    /* Boşluq həmişə düzgün notanın TAM hündürlüyündə açılır.
+       Təsadüfi yerdəyişmə YOXDUR — əks halda şagird öz səhvi ilə
+       oyunun kaprizini ayırd edə bilməz. */
+    const gapCenterY = this.mapping.freqToY(note.freq);
 
     this.list.push({
       x: this.spawnX,
-      note: note,
-      gapCenterY: gapCenterY,
-      passed: false
+      note,
+      gapCenterY,
+      passed: false,
+      cleared: true          // boru boyunca entonasiya təmiz qaldımı
     });
   }
 
   update(deltaMs) {
-    const speed = this.pipeSpeed + this.difficulty * 0.1;
+    const dt = deltaMs / 1000;
+    const dx = this.level.scrollSpeedPxPerSec * dt;
 
-    this.list.forEach(p => {
-      p.x -= speed;
-    });
+    for (const p of this.list) p.x -= dx;
 
-    if (this.list.length && this.list[this.list.length - 1].x < this.width - 280) {
+    this.timeSinceSpawn += deltaMs;
+    if (this.timeSinceSpawn >= this.level.gapSpacingMs) {
+      this.timeSinceSpawn = 0;
       this.spawnPipe();
     }
 
-    this.list = this.list.filter(p => p.x > -this.pipeWidth - 20);
+    this.list = this.list.filter(p => p.x > -this.geometry.widthPx - 20);
   }
 
-  increaseDifficulty() {
-    this.difficulty = Math.min(5, this.difficulty + 1);
-    this.pipeSpeed = Math.min(5.2, this.pipeSpeed + 0.06);
-  }
-
+  /* Boşluq mərkəzə görə simmetrik DEYİL — nota qlifi simmetrik
+     olmadığı üçün. Nota başı hər halda mərkəzdə ±tolerantlıq
+     sərbəstliyi ilə hərəkət edir. */
   getGapTop(pipe) {
-    return pipe.gapCenterY - this.pipeGap / 2;
+    return pipe.gapCenterY - this.geometry.gapAbovePx;
+  }
+
+  /* Borunun aşağı gövdəsi zəminə qədər uzanır */
+  getFloor() {
+    return this.mapping.floorY;
   }
 
   getGapBottom(pipe) {
-    return pipe.gapCenterY + this.pipeGap / 2;
+    return pipe.gapCenterY + this.geometry.gapBelowPx;
   }
 
   getCurrentRequiredNote() {
     for (const p of this.list) {
-      if (p.x > 0 && p.x < this.spawnX) {
-        return p.note;
-      }
+      if (p.x + this.geometry.widthPx > 0 && !p.passed) return p.note;
     }
     return null;
   }
