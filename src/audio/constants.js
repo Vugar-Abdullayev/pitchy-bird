@@ -1,19 +1,16 @@
-/* NOTES configuration - G3 (196Hz) to E5 (659Hz) */
-export const NOTES = [
-  {name:'G3', freq:196.00},
-  {name:'A3', freq:220.00},
-  {name:'B3', freq:246.94},
-  {name:'C4', freq:261.63},
-  {name:'D4', freq:293.66},
-  {name:'E4', freq:329.63},
-  {name:'F#4', freq:369.99},
-  {name:'G4', freq:392.00},
-  {name:'A4', freq:440.00},
-  {name:'B4', freq:493.88},
-  {name:'C5', freq:523.25},
-  {name:'D5', freq:587.33},
-  {name:'E5', freq:659.25}
-];
+/* NOTES configuration - Full chromatic scale G3 (MIDI 55) to E5 (MIDI 76) */
+export const NOTES = (() => {
+  const notes = [];
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  // G3 = MIDI 55, E5 = MIDI 76
+  for (let midi = 55; midi <= 76; midi++) {
+    const name = NOTE_NAMES[midi % 12];
+    const octave = Math.floor(midi / 12) - 1;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    notes.push({ name: name + octave, freq: Math.round(freq * 100) / 100 });
+  }
+  return notes;
+})();
 
 /* Frequency bounds for pitch mapping */
 export const MIN_FREQ = NOTES[0].freq * 0.94;

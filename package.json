@@ -13,6 +13,7 @@
     "test": "node test/report.mjs && node test/stress.mjs && node test/pipeline.mjs"
   },
   "devDependencies": {
+    "playwright": "^1.62.1",
     "vite": "^5.0.0"
   }
 }

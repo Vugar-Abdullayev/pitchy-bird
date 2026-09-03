@@ -1,6 +1,7 @@
 import '../style.css';
 import { PitchDetector } from './audio/PitchDetector.js';
 import { SCALES, buildScaleNotes, freqToNoteName, midiToFreq, MIDI_G3 } from './audio/scales.js';
+import { NOTES } from './audio/constants.js';
 import { createPitchMapping } from './game/pitchMapping.js';
 import { getLevel, LEVELS, pipeGeometry } from './game/difficulty.js';
 import { MelodySource } from './game/MelodySource.js';
@@ -96,7 +97,8 @@ function layout() {
   if (!pipes) pipes = new Pipe({ mapping, level, geometry, melody, width: cssW });
   else pipes.configure({ mapping, level, geometry, melody, width: cssW });
 
-  renderer.configure({ mapping, geometry, notes, width: cssW, height: cssH, birdX });
+  // Pass full chromatic NOTES for staff display, scale notes for pipes
+  renderer.configure({ mapping, geometry, notes: NOTES, width: cssW, height: cssH, birdX });
 
   if (!running) renderer.render({ bird, pipes, reading: null });
 }

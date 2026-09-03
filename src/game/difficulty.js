@@ -176,6 +176,10 @@ export function pipeGeometry(level, mapping) {
   const extentDown = GLYPH.extentDown * u;
   const extentX = GLYPH.extentX * u;
 
+  // Pipe width reduced by ~35% (factor 0.65) for slimmer, refined look
+  // while keeping gap size (tolerance zone) unchanged
+  const PIPE_WIDTH_FACTOR = 0.65;
+
   return {
     glyphUnitPx: u,
     extentUp,
@@ -185,7 +189,7 @@ export function pipeGeometry(level, mapping) {
     gapAbovePx: tolPx + extentUp,
     gapBelowPx: tolPx + extentDown,
     gapPx: 2 * tolPx + extentUp + extentDown,
-    widthPx: (level.holdMs / 1000) * level.scrollSpeedPxPerSec,
+    widthPx: (level.holdMs / 1000) * level.scrollSpeedPxPerSec * PIPE_WIDTH_FACTOR,
     toleranceCents: level.toleranceCents,
     effectiveToleranceCents: mapping.pxToCents(tolPx)
   };
